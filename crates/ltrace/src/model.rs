@@ -27,7 +27,7 @@ impl Expectation {
             "expectation needs a source/reason"
         );
         anyhow::ensure!(
-            !self.operation.is_empty() && !self.service.is_empty(),
+            !self.operation.trim().is_empty() && !self.service.trim().is_empty(),
             "expectation needs an operation and service"
         );
         anyhow::ensure!(
