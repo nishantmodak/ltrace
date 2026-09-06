@@ -69,13 +69,46 @@ Give your coding agent [the companion skill](skills/ltrace-debug/SKILL.md). It d
 
 ## Automatic findings
 
-Each selected trace is checked for repeated SQL, slow dependencies, and retries. Findings appear above its waterfall, with the same JSON available to coding agents:
+**The app does not use AI to generate findings.** Detection runs locally as deterministic Rust rules; explanations and suggestions are predefined text. There are no model calls, AI-provider API keys, or cloud uploads. Your existing coding agent can read the same evidence, inspect the source, propose a fix, and rerun tests through the companion skill.
+
+Findings appear **above the selected trace's waterfall**. Clicking one expands branches, highlights matching spans, and opens its explanation and evidence on the right. The CLI returns the same report:
 
 ```sh
 ltrace-dev findings RUN_ID TRACE_ID
 ```
 
-The initial rules are deliberately explicit: at least five sibling database spans with identical recorded `db.query.text`/`db.statement`, SQL spans taking at least 100 ms or HTTP spans taking at least 250 ms, and sibling attempts with distinct `retry.attempt`/`http.request.resend_count` values and an observed failure. Query literals are not normalized. These are investigation leads, not proof that batching or changing retry behavior is correct. Missing attributes and capture problems are shown as detection limits; no findings is not a correctness guarantee.
+These are all implemented patterns:
+
+| Pattern | Exact trigger | Interpretation and limitations |
+| --- | --- | --- |
+| Possible N+1 | **5 or more spans** with the same trace, service, nonempty parent ID, and recorded query text from `db.query.text` or `db.statement`. | Only surrounding whitespace is trimmed. SQL literals, case, and internal whitespace are not normalized. Repetition can be intentional; inspect source and workload before batching. |
+| Slow SQL | A database span takes **at least 100 ms**. Database identity comes from query text, `db.system.name`, or `db.system`. | Fixed starting threshold, not an application-specific budget. Requires valid timestamps. |
+| Slow HTTP | An HTTP span takes **at least 250 ms**. Identity comes from `http.request.method`, `http.method`, `http.response.status_code`, `http.status_code`, `url.full`, or `http.url`. | Fixed starting threshold. Names such as `GET /items` alone do not establish HTTP instrumentation. |
+| Retry after failure | Sibling spans in the same trace and service contain **at least two distinct numeric attempt counters**, with at least one span marked as an error. Uses `retry.attempt` or `http.request.resend_count`. | Requires explicit metadata and a nonempty parent ID. Equal counters do not imply a retry. A successful recovery may need no code change. |
+
+Slow SQL and HTTP are grouped under **Slow dependencies**. Counts refer to recorded spans, not unique network requests; overlapping durations are not summed into an estimated cost. Thresholds are currently fixed in the detector and are not configurable in the UI or CLI.
+
+Missing query text, dropped telemetry, invalid timestamps, missing parents, and capture-quality problems appear as **Detection limits**. Observed findings remain useful in a partial capture, but an empty findings list does not prove correct behavior or complete instrumentation. Results are capped at 50 findings and 200 span references per finding, with truncation disclosed; the UI offers the first 20 evidence links while retaining the observed count.
+
+Not implemented: separate redundant-call detection, HTTP N+1, excessive fanout, serialized-call analysis, pool saturation, or automatic cross-run performance regression detection. Explicit test expectations are a separate verification mechanism.
+
+### Detector test cases
+
+Run the focused suite without desktop dependencies:
+
+```sh
+cargo test -p ltrace-local --test findings --locked
+```
+
+The [detector tests](crates/ltrace/tests/findings.rs) cover:
+
+- A checkout fixture with repeated SQL, slow SQL/HTTP, and retry recovery, plus a small health trace without findings.
+- Four versus five repeated queries; current/legacy attributes; query text, parent, service, and trace boundaries; blank text and root spans.
+- SQL and HTTP duration boundaries, unsupported operation names, invalid timing, and every supported HTTP identity attribute.
+- Retry counters in integer/string form, both naming conventions, equal and malformed counters, missing failure markers, and unrelated requests.
+- Partial telemetry, bounded evidence, deterministic output, the 50-finding limit, and API isolation when different runs reuse a trace ID.
+
+Frontend tests additionally verify that selecting a finding highlights its spans and opens the cited raw evidence. These tests establish the implemented rules; they do not measure real-world precision or recall.
 
 ## Inspect small and complex demo traces
 
