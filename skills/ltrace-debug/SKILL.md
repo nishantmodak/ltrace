@@ -9,11 +9,21 @@ Own the local development loop: establish expectations, add targeted OTel instru
 
 ## Discover the available integration
 
-This skill accompanies a product under development. It does not establish that any runtime, command, or MCP tool exists. Inspect the project's integration documentation and available tool schemas before invoking ltrace functionality. Verify that an executable belongs to this project rather than relying only on its name. Use documented capabilities; do not invent commands, tool names, schemas, or results.
+The implemented reader is the `ltrace-dev` CLI, bundled with the desktop app or installed from this repository. The desktop's **Connection details** provides the exact executable and data-directory arguments. Run `ltrace-dev --version` and `ltrace-dev doctor` (with `--home` if provided) to verify the product and receiver. Do not confuse it with Linux's unrelated `ltrace` utility. There is no MCP server in this version.
 
-Read [reader-contract.md](references/reader-contract.md) when interpreting session evidence or developing the integration. It is a proposed contract, not a runnable interface.
+Read [reader-contract.md](references/reader-contract.md) for the actual command and evidence contract. The receiver starts with the desktop app or `ltrace-dev serve`. Standard OTLP HTTP exports appear automatically under Incoming traces. Do not ask the developer to create a debugging session or register a project.
 
-If the integration is unavailable, say so briefly and continue useful debugging with existing tests, logs, or accessible trace files. Do not install a backend or instrument the whole application merely to satisfy this skill.
+For an isolated test run, execute from the application repository:
+
+```sh
+ltrace-dev capture --label "Reproduce the issue" --expectations expectations.json -- your-test-command
+```
+
+The expectations file is optional. It is a JSON array of `{name, reason, service, operation, min_count, max_count}` using exact span/service names and task-backed reasons. Save the contract before running and reuse it unchanged for equivalent verification. The runner discovers the project, creates the run, sets child-local trace export credentials and endpoint, and returns its JSON summary on stdout. Child output is forwarded to stderr. It does not add instrumentation by itself.
+
+Use the returned run ID with `ltrace-dev show run RUN_ID`, `ltrace-dev traces RUN_ID --search OPERATION`, `ltrace-dev spans RUN_ID --limit 100`, and `ltrace-dev span RUN_ID TRACE_ID SPAN_ID`. Submit a concise observation using `ltrace-dev note PROJECT_ID --run RUN_ID --body "Observation and evidence references"`; the project grouping ID is `run.session_id` in the report. Internal session IDs are grouping details, not a required setup task.
+
+If the receiver is unavailable, explain the concrete connection problem and continue useful debugging with existing tests/logs. Do not invent successful captures or install a backend merely to satisfy the skill. The included catalog example documents the supported Python unittest/OTel SDK recipe; other stacks require checking the project's existing setup and official SDK APIs.
 
 ## Establish expectations and instrument
 
@@ -29,9 +39,9 @@ Record a concise instrumentation note with changed files and the question each a
 
 Use the project's existing test or reproduction command. Reuse an appropriate capture if it already answers the question. When capture is supported, associate the run with its command, working directory, repository state, session ID, and time window. Preserve the command's actual result separately from collector errors.
 
-Check which services exported telemetry and whether the application is instrumented. A quiet collector does not establish that no code ran. Do not attach unrelated background traffic to a test based only on arrival time. Prefer explicit session attribution, otherwise disclose the ambiguity.
+Check which services exported telemetry and whether the application is instrumented. Plain Incoming traces are inspectable but are not test-attributed evidence; use capture for a claim about a specific test. A quiet collector does not establish that no code ran. Do not attach unrelated background traffic to a test based only on arrival time. Prefer explicit session attribution, otherwise disclose the ambiguity.
 
-Use supported integration actions to associate expectations, instrumentation notes, run IDs, and concise investigation updates with the desktop session. Both UI and reader should use the same local evidence; no additional telemetry export is needed for the UI. Do not claim an activity was published to the app without a successful tool result. Submit brief action/evidence summaries, not hidden reasoning.
+Use capture expectations and the note command to associate instrumentation changes, run IDs, and concise investigation updates with the desktop. Both UI and reader should use the same local evidence; no additional telemetry export is needed for the UI. Do not claim an activity was published to the app without a successful tool result. Submit brief action/evidence summaries, not hidden reasoning.
 
 ## Inspect before forming a diagnosis
 
@@ -41,7 +51,7 @@ Match the inspection to the symptom:
 
 - Slow request: examine operation durations, overlapping work, and time not covered by recorded child spans.
 - Repeated I/O: inspect normalized operation groups, counts, parent context, and representative calls; repetition is not automatically a bug.
-- Failure: inspect error status, exception events, related logs, and observed attempts; a missing error marker does not prove correct behavior.
+- Failure: inspect error status, exception events, exception events and observed attempts; a missing error marker does not prove correct behavior.
 - Disconnected trace: distinguish a missing referenced parent, an external span link, and a viewer grouping error. Sampling, late arrival, flush failure, and propagation are possibilities, not interchangeable diagnoses.
 
 Separate observations, hypotheses, and missing evidence. Parent duration minus the union of clipped child intervals is time outside recorded child spans, not measured CPU time. Cross-host clock differences and absent async dependencies can prevent reliable causal attribution.

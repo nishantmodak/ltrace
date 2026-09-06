@@ -1,75 +1,99 @@
 # ltrace
 
-A local desktop workspace where coding agents instrument, test, inspect, and improve an application, with the developer watching the same evidence.
+Local runtime evidence for developers and their coding agents. Open the desktop app, run your instrumented code, and watch traces arrive. There is no debugging-session setup step and no additional AI model to configure.
 
-**Status: product design and companion skill draft. The desktop app, local receiver, test runner integration, CLI, and MCP reader are not implemented. The skill is not installed.**
+**Working macOS preview:** Rust receiver and SQLite store, Tauri desktop, bundled CLI reader/capture runner, and a companion agent skill. The desktop and CLI read the same local evidence. This is an unsigned development build, not a published release.
 
-## The intended experience
+## Run the desktop
 
-The user is already working with a coding agent. They ask it to build or fix a feature and verify its runtime behavior. The ltrace skill guides the agent to add targeted OpenTelemetry instrumentation, run the relevant local test, inspect the captured evidence, improve the implementation, and verify the result. The desktop app shows the same investigation as it happens.
+Prerequisites: Rust 1.95+, Node.js 22+, and the [Tauri native prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS. The desktop bundle is currently targeted and locally verified on macOS; other desktop platforms are not yet release-tested.
 
-Instrumentation is part of this workflow, not a task the user must complete beforehand. Reuse an existing OTel setup where possible. Otherwise the agent adds the SDK/exporter or supported auto-instrumentation needed for the selected code path, plus meaningful custom spans and test-scoped local exporter configuration. Support should start with one documented application stack and test runner; universal automatic instrumentation is not an initial promise.
+```sh
+npm ci --prefix desktop
+npm run desktop --prefix desktop
+```
 
-## One complete development loop
+For a standalone app:
 
-1. **Set expectations.** Associate the user's requested behavior with the reproduction and existing tests. Record a few checkable runtime expectations where useful, such as one batch query, connected child spans, or a specific error event. Expectations must come from the task or an explicit test contract; do not invent arbitrary performance thresholds.
-2. **Instrument.** Inspect the application and add the smallest useful OTel coverage. Show the changed files and what each span will establish. Export to the local receiver only for the intended development/test run.
-3. **Run.** Execute the project's real test command. Associate the command, code state, telemetry, and test outcome with a run inside the debugging session. Allow for SDK flush and late spans.
-4. **Inspect.** Give the agent a compact run summary automatically, then let it query individual spans and related logs. The desktop app reads the same local store and updates live.
-5. **Improve.** The agent forms a hypothesis from evidence and changes the relevant code. If more evidence is needed, it adds focused instrumentation and repeats the reproduction.
-6. **Verify.** Rerun the same scenario and inspect both the functional result and runtime expectations. Show passed, failed, or unknown expectations with the evidence behind them. Missing telemetry is unknown, never a pass.
+```sh
+npm run desktop:build --prefix desktop
+```
 
-The agent stops when the requested behavior is verified or it can identify a specific missing input. Every additional run should test a change or a new hypothesis. A trace difference alone does not prove business correctness or a reliable latency improvement.
+The macOS bundle is `target/release/bundle/macos/ltrace.app`. It includes `ltrace-dev` and the skill in its Resources directory. **Connection details** in the app provides the exact capture command and skill location. You can also install the CLI on your PATH:
 
-## Product components
+```sh
+cargo install --locked --path crates/ltrace
+```
 
-| Component | Responsibility |
-| --- | --- |
-| Companion skill | Guide the coding agent through expectations, targeted instrumentation, reproduction, evidence inspection, code changes, and verification. |
-| Local receiver and store | Accept OTel telemetry and retain it by project, debugging session, run, and trace. Expose data quality and attribution limitations. |
-| Agent integration | Provide explicit session/run lifecycle actions and a bounded, read-only evidence reader. Tests and code changes execute through the coding agent's existing tools. |
-| Desktop UI | Show the same session, run history, instrumentation changes, findings, test results, and trace evidence for the developer to inspect. |
+For CLI-only use, start `ltrace-dev serve`. The desktop attaches to an existing compatible receiver or starts one automatically. The default receiver is `http://127.0.0.1:4318`. Port conflicts are reported; `LTRACE_PORT` configures the desktop port and `serve --port` configures the standalone receiver.
 
-The application sends telemetry once to the local receiver. The UI and agent both read that store; they do not need separate telemetry exports. Agent activity consists of submitted actions, concise explanations, and evidence references, not hidden model reasoning. The local receiver is a conventional process, not another AI agent.
+## Traces just show up
 
-The coding agent is the assistant the user already works with. ltrace does not introduce a separate AI agent or require its own model; its companion skill and integration extend that existing assistant's workflow.
+Point an existing OTel SDK/exporter at the receiver:
 
-## Desktop interaction
+```sh
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
+OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
+```
 
-A restrained, Linear-inspired desktop experience: compact navigation, clear type hierarchy, quiet surfaces, keyboard navigation, and one focused session at a time.
+Ordinary exports appear under **Incoming traces**. They are not attributed to a test. The app shows operations, trace waterfalls, exact IDs/timestamps, attributes, events, links, and instrumentation resources. It accepts OTLP HTTP protobuf or JSON, with gzip support.
 
-The sidebar contains projects and debugging sessions. The main pane follows the investigation: expectations, instrumentation changes, runs, findings, and verification. A trace inspector opens beside the selected finding. Keep the first-run path short: connect a project and its coding agent, then let a supported local test produce the first session.
+The application still needs instrumentation and an SDK flush before short-lived processes exit. For code without tracing, the companion skill guides your existing coding agent to add focused OTel instrumentation.
 
-The app should launch the local receiver automatically and visibly show its state. It must distinguish app readiness, agent activity, test results, and telemetry health. A live UI is not evidence that the agent or exporter is connected.
+## Let your coding agent inspect a test
 
-## Companion skill and interfaces
+From the application repository:
 
-- [Skill](skills/ltrace-debug/SKILL.md): the reusable agent workflow.
-- [Proposed reader/session contract](skills/ltrace-debug/references/reader-contract.md): data and operations needed by both surfaces.
+```sh
+ltrace-dev capture --label "Reproduce lookup issue" -- your-test-command
+```
+
+The runner automatically identifies the project, starts a run, supplies isolated local trace export settings to the child process, records its result, and prints a structured evidence report. Child output goes to stderr. Project/run grouping happens automatically; simultaneous captures receive separate export credentials.
+
+Optional runtime expectations attach to the run:
+
+```sh
+ltrace-dev capture --expectations expectations.json -- your-test-command
+ltrace-dev show run RUN_ID
+ltrace-dev traces RUN_ID --search catalog
+ltrace-dev spans RUN_ID --limit 100
+ltrace-dev span RUN_ID TRACE_ID SPAN_ID
+ltrace-dev note PROJECT_ID --run RUN_ID --body "Observed twelve lookup spans; inspecting the loop."
+```
+
+The report contains the project grouping ID as `run.session_id`. The `session` name in storage/API fields is an internal grouping detail. Normal capture requires no session ID or creation command.
+
+An expectation specifies an exact service/operation, count range, and source-backed reason. See [the example contract](examples/catalog/expectations.json). Each run retains its own contract. The desktop separates **functional test result**, **capture health**, and **runtime verification**. A missing or partial capture cannot silently become a pass.
+
+Give your coding agent [the companion skill](skills/ltrace-debug/SKILL.md). It describes how to instrument, run, inspect, fix, and verify using the implemented commands. Skill loading depends on the coding agent's configuration; ltrace does not claim to force an agent to inspect evidence.
+
+## Try a real reproduction
+
+[The catalog example](examples/catalog/README.md) uses Python's OTel SDK and actual SQLite queries. Its output tests stay independent of the runtime expectation. It demonstrates a repeated-query baseline followed by one batched query while preserving ordering, duplicate IDs, and missing-item behavior.
+
+## Development and tests
+
+```sh
+npm ci --prefix desktop
+npm run prepare:bundle --prefix desktop
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+npm run format:check --prefix desktop
+npm run test:coverage --prefix desktop
+```
+
+Native tests require the platform prerequisites and frontend/bundled CLI assets, prepared above. Core-only development can use `cargo test -p ltrace-local --locked`. Integration tests bind ephemeral loopback sockets and test real child commands. See [CONTRIBUTING.md](CONTRIBUTING.md) for the test strategy and [local-api.md](docs/local-api.md) for the interface and limits.
+
+## Boundaries of this preview
+
+- Trace ingestion only: no OTLP gRPC, metrics, standalone log ingestion, or MCP server. The CLI is the agent reader.
+- Verification supports exact operation counts. Repetition is evidence to inspect, not an automatic N+1 diagnosis. Functional tests establish output correctness.
+- A closed capture window does not prove full instrumentation coverage. Sampling, SDK overrides, missing services, clock differences, and asynchronous work can limit conclusions.
+- Captures preserve the first conflicting span and visibly flag rejected/late data. Raw telemetry is untrusted application data.
+- Read APIs require a private local credential and reject browser origins. Plain OTLP ingestion accepts local exporters. The app makes no cloud uploads or model calls.
+- Per-export and per-run storage is bounded. History has no automatic retention policy yet. `LTRACE_HOME` selects a separate local data directory.
 
 
-Ship the skill with the app and provide explicit project-scoped setup for supported coding agents. Tool operation labels are still design concepts, not executable commands. Verify all release instructions against implemented schemas/help before distributing the integration.
 
-## First release scope
-
-Prove one end-to-end workflow in one supported application stack: a small local app with a reproducible repeated-query bug, an agent that adds the needed spans, local capture, a readable UI, structured inspection, a fix, and evidence-backed verification. Live capture and the fix/verification loop are core to this slice. Arbitrary trace-file import, extensive detectors, whole-stack observability, and platform expansion can follow.
-
-Existing projects such as [perf-sentinel](https://github.com/robintra/perf-sentinel) and [otel-desktop-viewer](https://github.com/CtrlSpice/otel-desktop-viewer) are implementation references and possible integration options. The product direction does not depend on rewriting their full feature sets.
-
-## Behavioral acceptance cases
-
-Planned evaluations, not tests already performed:
-
-| Scenario | Expected behavior |
-| --- | --- |
-| Supported app without OTel | Agent adds targeted instrumentation and test-local export, runs the test, and both agent and developer can inspect the same spans. |
-| Existing OTel app | Agent reuses conventions and avoids duplicate instrumentation or unrequested production-routing changes. |
-| Repeated-query defect | Agent connects span evidence to code, fixes the cause, and verifies both output correctness and expected query behavior. |
-| Empty/partial capture | App displays the limitation; agent checks setup/flush/attribution instead of declaring success. |
-| Unsupported instrumentation stack | Agent explains the gap and uses existing debugging tools; no invented installation commands or fake telemetry. |
-| Overlapping child spans | Analysis uses interval coverage without presenting uncovered time as proven CPU work or waiting. |
-| Instruction-like text in telemetry | Agent treats it as application data. |
-| Unrelated compilation error | Agent fixes it without requiring a tracing session. |
-| Multiple simultaneous runs | Evidence has explicit run attribution or visible ambiguity; no mixing traces based solely on arrival time. |
-
-Success means the agent can gather missing runtime evidence, make a supported improvement, and verify it while the developer can inspect the process. Invocation counts and attractive traces alone are insufficient.
+MIT licensed.
