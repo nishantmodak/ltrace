@@ -1,4 +1,10 @@
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  act,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import App from "./App";
@@ -317,6 +323,54 @@ it("keeps failed note submissions visible rather than claiming success", async (
     "Receiver disconnected",
   );
   expect(screen.getByLabelText("Add a note")).toHaveValue("Observation");
+});
+it("preserves the comparison baseline when a note refreshes the session detail", async () => {
+  const user = userEvent.setup();
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  const detailResolvers: Array<(value: unknown) => void> = [];
+  const detailWithoutNote = {
+    session,
+    runs: [run, { ...run, id: "run-2", label: "Earlier" }],
+    notes: [],
+  };
+  const detailWithNote = {
+    ...detailWithoutNote,
+    notes: [
+      { id: "n1", created_ms: 1, run_id: run.id, body: "Baseline drift." },
+    ],
+  };
+  vi.mocked(api.read).mockImplementation(async (path) => {
+    if (path === `sessions/${session.id}`)
+      return new Promise<unknown>((resolve) => {
+        detailResolvers.push(resolve);
+      });
+    return original(path);
+  });
+  render(<App />);
+  await waitFor(() => expect(detailResolvers.length).toBeGreaterThan(0));
+  await act(async () => detailResolvers.shift()!(detailWithoutNote));
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Run details" }));
+  await user.selectOptions(screen.getByLabelText("Compare to"), "run-2");
+  expect(
+    await screen.findByRole("columnheader", { name: "Before" }),
+  ).toBeInTheDocument();
+  await user.type(screen.getByLabelText("Add a note"), "Baseline drift.");
+  await user.click(screen.getByRole("button", { name: "Add note" }));
+  await waitFor(() =>
+    expect(api.note).toHaveBeenCalledWith(
+      session.id,
+      "Baseline drift.",
+      run.id,
+    ),
+  );
+  expect(
+    screen.getByRole("heading", { name: "Run details" }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Compare to")).toHaveValue("run-2");
+  await act(async () => detailResolvers.shift()!(detailWithNote));
+  expect(screen.getByText("Baseline drift.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Compare to")).toHaveValue("run-2");
 });
 
 it("collapses a branch without hiding its parent or losing selected evidence", async () => {
