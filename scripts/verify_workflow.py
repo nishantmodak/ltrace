@@ -5,6 +5,7 @@ Run with the catalog virtual environment. No external services are contacted.
 --home attaches to an already running desktop so the same evidence is visible.
 """
 import argparse
+import contextlib
 import json
 import os
 from pathlib import Path
@@ -23,11 +24,13 @@ def main():
     parser.add_argument("--cli", type=Path, default=ROOT / "target/debug/ltrace-dev")
     parser.add_argument("--home", type=Path, help="Use an existing receiver")
     parser.add_argument("--scratch-parent", type=Path, help="Place the temporary reproduction inside a project")
+    parser.add_argument("--keep", action="store_true", help="Retain the reproduction source for desktop inspection")
     args = parser.parse_args()
     cli = args.cli.resolve()
     if args.scratch_parent:
         args.scratch_parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="ltrace-example-", dir=args.scratch_parent) as temporary:
+    workspace = contextlib.nullcontext(tempfile.mkdtemp(prefix="ltrace-example-", dir=args.scratch_parent)) if args.keep else tempfile.TemporaryDirectory(prefix="ltrace-example-", dir=args.scratch_parent)
+    with workspace as temporary:
         base = Path(temporary)
         project = base / "catalog"
         shutil.copytree(ROOT / "examples/catalog", project, ignore=shutil.ignore_patterns(".venv", "__pycache__"))
@@ -106,7 +109,7 @@ def main():
                 for result in results:
                     restored = command("show", "run", result["run_id"])
                     assert restored["verification"][0]["status"] == result["expectation"]
-            print(json.dumps({"results":results,"direct_exports":"visible without setup","persistence":"verified" if server else "using desktop store"}, indent=2))
+            print(json.dumps({"results":results,"direct_exports":"visible without setup","persistence":"verified" if server else "using desktop store", "reproduction": str(project) if args.keep else "temporary"}, indent=2))
         finally:
             if server and server.poll() is None:
                 stop(server)
