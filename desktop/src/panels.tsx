@@ -239,7 +239,13 @@ export function TracePanel({
                         })
                       }
                     >
-                      {collapsed.has(span.span_id) ? "›" : "⌄"}
+                      <svg
+                        viewBox="0 0 14 14"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path d="m5 3 4 4-4 4" />
+                      </svg>
                     </button>
                   ) : (
                     <span className="branch-spacer" />
