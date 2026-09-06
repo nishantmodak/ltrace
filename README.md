@@ -4,6 +4,10 @@ Local runtime evidence for developers and their coding agents. Open the desktop 
 
 **Working macOS preview:** Rust receiver and SQLite store, Tauri desktop, bundled CLI reader/capture runner, and a companion agent skill. The desktop and CLI read the same local evidence. This is an unsigned development build, not a published release.
 
+![ltrace desktop showing the checkout trace, a possible N+1 finding, highlighted query spans, and the evidence inspector](docs/images/ltrace-findings.jpg)
+
+*Synthetic checkout demo: select a finding to highlight its spans and inspect the supporting evidence.*
+
 ## Run the desktop
 
 Prerequisites: Rust 1.95+, Node.js 22+, and the [Tauri native prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS. The desktop bundle is currently targeted and locally verified on macOS; other desktop platforms are not yet release-tested.
