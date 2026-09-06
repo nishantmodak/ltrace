@@ -21,7 +21,9 @@ export function useLive<T>(
       setState({ key, data: null, error: "" });
       return;
     }
-    setState({ key, data: null, error: "" });
+    setState((previous) =>
+      previous.key === key ? previous : { key, data: null, error: "" },
+    );
     async function poll() {
       try {
         const data = await reader.current();

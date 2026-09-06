@@ -20,3 +20,25 @@ it("ignores a late response from a previously selected record", async () => {
   await act(async () => resolveOld("stale record"));
   expect(screen.queryByText("stale record")).not.toBeInTheDocument();
 });
+it("keeps the previous data while re-polling on a same-key refresh", async () => {
+  const resolvers: Array<(value: string) => void> = [];
+  let refresh!: () => void;
+  function View() {
+    const result = useLive(
+      "k",
+      () => new Promise<string>((resolve) => resolvers.push(resolve)),
+      0,
+    );
+    refresh = result.refresh;
+    return <div data-testid="val">{result.data}</div>;
+  }
+  render(<View />);
+  await act(async () => resolvers.shift()!("data-1"));
+  expect(screen.getByTestId("val")).toHaveTextContent("data-1");
+  await act(async () => {
+    refresh();
+  });
+  expect(screen.getByTestId("val")).toHaveTextContent("data-1");
+  await act(async () => resolvers.shift()!("data-2"));
+  expect(screen.getByTestId("val")).toHaveTextContent("data-2");
+});
