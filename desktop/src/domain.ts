@@ -144,7 +144,12 @@ export function orderedSpans(spans: Span[]): { span: Span; depth: number }[] {
 export function compareOperations(current: Summary, baseline: Summary) {
   const groups = new Map<
     string,
-    { service: string; name: string; before: number; after: number }
+    {
+      service: string;
+      name: string;
+      before: number | null;
+      after: number | null;
+    }
   >();
   for (const [summary, side] of [
     [baseline, "before"],
@@ -155,15 +160,17 @@ export function compareOperations(current: Summary, baseline: Summary) {
       const item = groups.get(key) ?? {
         service: op.service,
         name: op.name,
-        before: 0,
-        after: 0,
+        before:
+          baseline.operations_total > baseline.operations.length ? null : 0,
+        after: current.operations_total > current.operations.length ? null : 0,
       };
       item[side] = op.count;
       groups.set(key, item);
     }
   return [...groups.values()].sort(
     (a, b) =>
-      Math.abs(b.after - b.before) - Math.abs(a.after - a.before) ||
+      Math.abs((b.after ?? 0) - (b.before ?? 0)) -
+        Math.abs((a.after ?? 0) - (a.before ?? 0)) ||
       a.name.localeCompare(b.name),
   );
 }

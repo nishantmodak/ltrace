@@ -18,6 +18,10 @@ export default function App() {
     api.read<{ sessions: Session[] }>("sessions"),
   );
   const [projectId, setProjectId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!projectId && projects.data?.sessions[0])
+      setProjectId(projects.data.sessions[0].id);
+  }, [projectId, projects.data]);
   const project = projectId ?? projects.data?.sessions[0]?.id ?? null;
   const detail = useLive<SessionDetail>(project, () =>
     api.read(`sessions/${project}`),
@@ -44,15 +48,25 @@ export default function App() {
     setSelectedTrace(null);
     setRequestedSpan(null);
   }, [runId]);
+  const referenced = useLive<TracePage>(
+    selectedTrace &&
+      !traces.data?.traces.some((t) => t.trace_id === selectedTrace)
+      ? `${runId}:${selectedTrace}`
+      : null,
+    () => api.read(`runs/${runId}/traces?q=${selectedTrace}`),
+    0,
+  );
   const selected: Trace | undefined =
     traces.data?.traces.find((t) => t.trace_id === selectedTrace) ??
+    referenced.data?.traces[0] ??
     (!selectedTrace ? traces.data?.traces[0] : undefined);
   const error =
     connection.error ||
     projects.error ||
     detail.error ||
     report.error ||
-    traces.error;
+    traces.error ||
+    referenced.error;
   const failures =
     report.data?.verification.filter((v) => v.status === "failed").length ?? 0;
   const unknown =
@@ -65,6 +79,7 @@ export default function App() {
   }
   function inspectEvidence(reference: string) {
     const [trace, span] = reference.split("/");
+    setQuery("");
     setSelectedTrace(trace);
     setRequestedSpan(span);
     setShowRun(false);
@@ -250,7 +265,10 @@ export default function App() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
-                  <span>{traces.data?.total ?? 0} traces</span>
+                  <span>
+                    {traces.data?.total ?? 0}{" "}
+                    {(traces.data?.total ?? 0) === 1 ? "trace" : "traces"}
+                  </span>
                 </div>
                 <div className="trace-table">
                   <table>

@@ -9,3 +9,6 @@ edition = "2024"
 license = "MIT"
 rust-version = "1.95"
 
+
+[profile.release]
+strip = "symbols"

@@ -225,3 +225,65 @@ describe("trace-first desktop", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("opens an expectation evidence reference and returns to the trace", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Run details" }));
+  await user.click(screen.getByText("One batch query"));
+  await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  expect(await screen.findByLabelText("Trace inspector")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "Run details" }),
+  ).not.toBeInTheDocument();
+});
+it("switches historical runs without replacing them with the latest capture", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.selectOptions(screen.getByLabelText("Run"), "run-2");
+  await waitFor(() => expect(api.read).toHaveBeenCalledWith("runs/run-2"));
+  expect(screen.getByLabelText("Run")).toHaveValue("run-2");
+});
+it("renders unassigned incoming traffic without claiming tests passed", async () => {
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  vi.mocked(api.read).mockImplementation(async (path) =>
+    path === `runs/${run.id}`
+      ? {
+          ...report,
+          run: { ...run, test_status: "not_run", capture_status: "collecting" },
+          verification: [],
+        }
+      : original(path),
+  );
+  render(<App />);
+  expect(await screen.findByText("· Not linked to a test")).toBeInTheDocument();
+  expect(screen.queryByText("· Test passed")).not.toBeInTheDocument();
+});
+it("copies a runnable command using the bundled CLI and selected data directory", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Connection details" }));
+  await user.click(screen.getByRole("button", { name: "Copy command" }));
+  expect(
+    await screen.findByRole("button", { name: "Copied" }),
+  ).toBeInTheDocument();
+  expect(await navigator.clipboard.readText()).toContain(
+    "--home '/data' capture --",
+  );
+});
+it("keeps failed note submissions visible rather than claiming success", async () => {
+  vi.mocked(api.note).mockRejectedValue(new Error("Receiver disconnected"));
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Run details" }));
+  await user.type(screen.getByLabelText("Add a note"), "Observation");
+  await user.click(screen.getByRole("button", { name: "Add note" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Receiver disconnected",
+  );
+  expect(screen.getByLabelText("Add a note")).toHaveValue("Observation");
+});

@@ -76,3 +76,15 @@ describe("trace arithmetic", () => {
     expect(result[0]).toMatchObject({ service: "b", before: 12, after: 0 });
   });
 });
+
+it("does not invent zero counts for groups omitted from a truncated summary", () => {
+  const current = {
+    operations: [{ service: "a", name: "lookup", count: 1 }],
+    operations_total: 1,
+  } as Summary;
+  const baseline = {
+    operations: [],
+    operations_total: 101,
+  } as unknown as Summary;
+  expect(compareOperations(current, baseline)[0].before).toBeNull();
+});
