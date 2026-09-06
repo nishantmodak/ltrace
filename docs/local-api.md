@@ -4,6 +4,12 @@ Run `cargo run -p ltrace-local --bin ltrace-dev -- serve`. Default port: 4318, b
 
 The desktop and CLI discover `connection.json` in the application data directory (`LTRACE_HOME` overrides it). The directory is private and the connection file is mode 0600 on Unix. Management requests require its bearer token. Browser origins are rejected; the native UI uses IPC. Tokens are local capabilities; do not copy them into source control or agent messages. Proxy routing and redirects are disabled in the client.
 
+## Automatic collection
+
+Open the desktop app or start the receiver, then export standard OTLP traces to its local endpoint. No project or debugging session creation is required. Plain exports appear under **Incoming traces**, with no claimed test association. Streams rotate after an hour or when their storage budget is reached.
+
+`ltrace-dev capture -- <test command>` discovers the Git root (or current directory), creates/reuses a project group atomically, starts an isolated run, and returns its report. `--expectations expectations.json` attaches a contract to that run. Internal session IDs remain a storage/API grouping detail; developers do not need to manage them.
+
 ## Operations
 
 All management paths begin `/api/` and use JSON:
@@ -12,20 +18,21 @@ All management paths begin `/api/` and use JSON:
 | --- | --- | --- |
 | GET | health | Product, version, API version |
 | GET | sessions | Latest 200 sessions |
+| POST | projects/ensure | `{project}`; create/reuse a project group |
 | POST | sessions | `{title, project, expectations: []}` |
 | GET | sessions/:id | Session, latest 200 runs and notes |
-| POST | sessions/:id/runs | `{label, command, revision}`; returns run and private export token |
+| POST | sessions/:id/runs | `{label, command, revision, expectations: []}`; returns run and private export token |
 | POST | sessions/:id/notes | `{run_id: null, body}` |
 | POST | runs/:id/finish | `{exit_code: 0, issue: null}`; can finish once |
 | GET | runs/:id | Test/capture states, quality issues, first 100 operation groups, expectations |
 | GET | runs/:id/spans | Raw spans, `total`, `next_offset`; `offset`, `limit` (1–200), optional `trace_id` |
 | GET | runs/:id/spans/:trace/:span | Raw span and uncovered recorded child time |
 
-Expectation shape: `{name, reason, service, operation, min_count, max_count}`. Names match exactly. Expectations are immutable within a session and snapshotted into runs. Create a new session for a changed contract. Each verification cites up to 20 span references. A missing matching operation stays unknown, including expectations of zero executions. Counts exceeding the maximum are observed counterexamples even with partial data. Tests remain the authority for functional correctness.
+Expectation shape: `{name, reason, service, operation, min_count, max_count}`. Names match exactly. Expectations are snapshotted into each run and cannot be changed after that run starts. Compare the contracts as well as the workload when comparing runs. Each verification cites up to 20 span references. A missing matching operation stays unknown, including expectations of zero executions. Counts exceeding the maximum are observed counterexamples even with partial data. Tests remain the authority for functional correctness.
 
 ## Export and limits
 
-`POST /v1/traces` accepts OTLP HTTP `application/x-protobuf` and `application/json`, with identity or gzip encoding. Each export requires `x-ltrace-run-token`, supplied automatically by `ltrace-dev capture` through `OTEL_EXPORTER_OTLP_TRACES_HEADERS`. No arrival-time attribution or default run is used. gRPC, metrics, and log ingestion are not supported in v0.
+`POST /v1/traces` accepts OTLP HTTP `application/x-protobuf` and `application/json`, with identity or gzip encoding. Test-attributed exports use `x-ltrace-run-token`, supplied automatically by `ltrace-dev capture` through `OTEL_EXPORTER_OTLP_TRACES_HEADERS`. Exports without that header go to a separate incoming stream; an invalid supplied token is rejected. Incoming traffic never becomes test evidence based on arrival time. gRPC, metrics, and log ingestion are not supported in v0.
 
 Limits: 4 MiB compressed and expanded requests, 10,000 spans per request, 64 KiB per span including its resource/scope, and 50,000 spans or 64 MiB of stored span JSON per run. Oversized/malformed exports taint the attributed run. Storage-limit rejections return OTLP partial success. Exact retries are idempotent. Conflicting IDs preserve the first version and taint the run. Exports received after finishing are retained with a partial-capture warning.
 

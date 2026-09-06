@@ -80,6 +80,7 @@ pub async fn start(dir: &Path, port: u16) -> Result<LocalServer> {
     let app = router(AppState {
         store,
         token: info.token.clone(),
+        live: Default::default(),
     });
     let task = tokio::spawn(async move {
         if let Err(e) = axum::serve(listener, app).await {

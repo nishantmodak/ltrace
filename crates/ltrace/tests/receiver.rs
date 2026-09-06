@@ -27,6 +27,7 @@ fn setup() -> (axum::Router, Arc<Store>, String, String) {
         api::router(AppState {
             store: store.clone(),
             token: "management-secret".into(),
+            live: Default::default(),
         }),
         store,
         run.id,
@@ -219,4 +220,41 @@ async fn large_body_is_bounded_before_deserialization() {
         .status(),
         StatusCode::PAYLOAD_TOO_LARGE
     );
+}
+
+#[tokio::test]
+async fn ordinary_otlp_exports_appear_without_creating_a_session() {
+    let (app, store, explicit_run, token) = setup();
+    let before = store.sessions().unwrap().len();
+    let request = Request::post("/v1/traces")
+        .header("content-type", "application/json")
+        .body(Body::from(FIXTURE))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(request).await.unwrap().status(),
+        StatusCode::OK
+    );
+    let projects = store.sessions().unwrap();
+    assert_eq!(projects.len(), before + 1);
+    let incoming = projects
+        .iter()
+        .find(|p| p.project == "ltrace:incoming")
+        .unwrap();
+    let runs = store.runs(&incoming.id).unwrap();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].test_status, "not_run");
+    assert_eq!(store.spans(&runs[0].id).unwrap().len(), 1);
+    assert!(store.spans(&explicit_run).unwrap().is_empty());
+    app.clone()
+        .oneshot(export(&token, "application/json", FIXTURE.to_vec()))
+        .await
+        .unwrap();
+    let retry = Request::post("/v1/traces")
+        .header("content-type", "application/json")
+        .body(Body::from(FIXTURE))
+        .unwrap();
+    app.oneshot(retry).await.unwrap();
+    assert_eq!(store.runs(&incoming.id).unwrap().len(), 1);
+    assert_eq!(store.spans(&runs[0].id).unwrap().len(), 1);
+    assert_eq!(store.spans(&explicit_run).unwrap().len(), 1);
 }

@@ -235,3 +235,40 @@ fn notes_cannot_reference_another_session_run() {
     .unwrap();
     assert_eq!(s.notes(&a).unwrap().len(), 1);
 }
+
+#[test]
+fn automatic_project_grouping_is_concurrency_safe_and_expectations_are_per_run() {
+    let s = std::sync::Arc::new(store());
+    let threads: Vec<_> = (0..8)
+        .map(|_| {
+            let s = s.clone();
+            std::thread::spawn(move || s.ensure_project("/project", "project").unwrap().id)
+        })
+        .collect();
+    let ids: std::collections::BTreeSet<_> =
+        threads.into_iter().map(|t| t.join().unwrap()).collect();
+    assert_eq!(ids.len(), 1);
+    let sid = ids.first().unwrap();
+    let contract = vec![Expectation {
+        name: "one".into(),
+        reason: "task".into(),
+        service: "example".into(),
+        operation: "db.lookup".into(),
+        min_count: 1,
+        max_count: 1,
+    }];
+    let (first, _) = s
+        .start_run_with_expectations(
+            sid,
+            "first".into(),
+            "test".into(),
+            "".into(),
+            Some(contract),
+        )
+        .unwrap();
+    let (second, _) = s
+        .start_run_with_expectations(sid, "second".into(), "test".into(), "".into(), Some(vec![]))
+        .unwrap();
+    assert_eq!(s.run(&first.id).unwrap().expectations.len(), 1);
+    assert!(second.expectations.is_empty());
+}

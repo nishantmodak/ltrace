@@ -119,3 +119,40 @@ async fn capture_preserves_exit_code_empty_capture_timeout_and_spawn_failure() {
         }
     }
 }
+
+#[tokio::test]
+async fn capture_discovers_project_and_creates_runs_without_setup() {
+    let tmp = tempfile::tempdir().unwrap();
+    let _server = local::start(tmp.path(), 0).await.unwrap();
+    let client = Client::connect(tmp.path()).unwrap();
+    #[cfg(unix)]
+    for _ in 0..2 {
+        let output = tokio::process::Command::new(env!("CARGO_BIN_EXE_ltrace-dev"))
+            .arg("--home")
+            .arg(tmp.path())
+            .args([
+                "capture",
+                "--settle-ms",
+                "0",
+                "--",
+                "/bin/sh",
+                "-c",
+                "exit 0",
+            ])
+            .output()
+            .await
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(report["run"]["test_status"], "passed");
+    }
+    let projects = client.read("sessions").await.unwrap();
+    assert_eq!(projects["sessions"].as_array().unwrap().len(), 1);
+    let id = projects["sessions"][0]["id"].as_str().unwrap();
+    let project = client.read(&format!("sessions/{id}")).await.unwrap();
+    assert_eq!(project["runs"].as_array().unwrap().len(), 2);
+}

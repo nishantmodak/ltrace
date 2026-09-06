@@ -17,6 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 pub struct AppState {
     pub store: Arc<Store>,
     pub token: String,
+    pub live: Arc<std::sync::Mutex<Option<(String, String, u64)>>>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -171,6 +172,8 @@ pub struct StartRun {
     pub command: String,
     #[serde(default)]
     pub revision: String,
+    #[serde(default)]
+    pub expectations: Option<Vec<Expectation>>,
 }
 #[derive(Deserialize, Serialize)]
 pub struct FinishRun {
@@ -186,6 +189,18 @@ pub struct AddNote {
 pub fn write(store: &Store, path: &str, body: Value) -> Result<Value> {
     let parts: Vec<_> = path.split('/').collect();
     match parts.as_slice() {
+        ["projects", "ensure"] => {
+            let project = body["project"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("project path required"))?;
+            let title = std::path::Path::new(project)
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy();
+            Ok(serde_json::to_value(
+                store.ensure_project(project, &title)?,
+            )?)
+        }
         ["sessions"] => {
             let b: CreateSession = serde_json::from_value(body)?;
             Ok(serde_json::to_value(store.create_session(
@@ -196,7 +211,13 @@ pub fn write(store: &Store, path: &str, body: Value) -> Result<Value> {
         }
         ["sessions", id, "runs"] => {
             let b: StartRun = serde_json::from_value(body)?;
-            let (run, token) = store.start_run(id, b.label, b.command, b.revision)?;
+            let (run, token) = store.start_run_with_expectations(
+                id,
+                b.label,
+                b.command,
+                b.revision,
+                b.expectations,
+            )?;
             Ok(json!({"run":run,"export_token":token}))
         }
         ["sessions", id, "notes"] => {
@@ -228,13 +249,6 @@ async fn export(
         .and_then(|s| s.to_str().ok())
         .unwrap_or("")
         .to_owned();
-    if token.is_empty() {
-        return (
-            StatusCode::UNAUTHORIZED,
-            "x-ltrace-run-token required; use ltrace-dev capture",
-        )
-            .into_response();
-    }
     let content_type = headers
         .get("content-type")
         .and_then(|s| s.to_str().ok())
@@ -257,17 +271,64 @@ async fn export(
         }
     };
     let result = tokio::task::spawn_blocking(move || -> Result<usize> {
-        state.store.check_token(&token)?;
-        match otlp::decode(&body, &content_type, &encoding)
-            .and_then(|spans| state.store.ingest(&token, &spans))
-        {
-            Ok(report) => Ok(report.rejected),
-            Err(e) => {
+        if !token.is_empty() {
+            state.store.check_token(&token)?;
+        }
+        let spans = match otlp::decode(&body, &content_type, &encoding) {
+            Ok(spans) => spans,
+            Err(error) => {
+                if !token.is_empty() {
+                    state.store.mark_issue(
+                        &token,
+                        "An export was rejected; inspect exporter errors and rerun.",
+                    )?;
+                }
+                return Err(error);
+            }
+        };
+        if spans.is_empty() {
+            return Ok(0);
+        }
+        let token = if token.is_empty() {
+            let mut live = state
+                .live
+                .lock()
+                .map_err(|_| anyhow::anyhow!("live stream lock poisoned"))?;
+            if live.as_ref().is_some_and(|(_, _, created)| {
+                crate::model::now_ms().saturating_sub(*created) > 3_600_000
+            }) && let Some((id, _, _)) = live.take()
+            {
+                state.store.close_stream(&id)?;
+            }
+            if live.is_none() {
+                let (run, token) = state.store.start_stream()?;
+                *live = Some((run.id, token, run.started_ms));
+            }
+            live.as_ref().expect("stream initialized").1.clone()
+        } else {
+            token
+        };
+        match state.store.ingest(&token, &spans) {
+            Ok(report) => {
+                if report.rejected > 0 {
+                    let mut live = state
+                        .live
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("live stream lock poisoned"))?;
+                    if live.as_ref().is_some_and(|(_, t, _)| t == &token)
+                        && let Some((id, _, _)) = live.take()
+                    {
+                        state.store.close_stream(&id)?;
+                    }
+                }
+                Ok(report.rejected)
+            }
+            Err(error) => {
                 state.store.mark_issue(
                     &token,
                     "An export was rejected; inspect exporter errors and rerun.",
                 )?;
-                Err(e)
+                Err(error)
             }
         }
     })

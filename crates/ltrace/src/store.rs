@@ -86,6 +86,61 @@ impl Store {
         let conn = self.connection()?;
         read_one(&conn, "SELECT body FROM sessions WHERE id=?1", id)
     }
+    /// Project grouping is automatic and atomic across concurrent capture commands.
+    pub fn ensure_project(&self, project: &str, title: &str) -> Result<Session> {
+        ensure!(
+            !project.is_empty() && project.len() <= 4096,
+            "invalid project path"
+        );
+        let conn = self.connection()?;
+        let existing: Option<String> = conn.query_row("SELECT body FROM sessions WHERE json_extract(body,'$.project')=?1 ORDER BY rowid LIMIT 1", [project], |r| r.get(0)).optional()?;
+        if let Some(body) = existing {
+            return Ok(serde_json::from_str(&body)?);
+        }
+        let session = Session {
+            id: Uuid::new_v4().to_string(),
+            title: title.chars().take(200).collect(),
+            project: project.into(),
+            created_ms: now_ms(),
+            expectations: vec![],
+        };
+        conn.execute(
+            "INSERT INTO sessions VALUES(?1,?2)",
+            params![session.id, json(&session)?],
+        )?;
+        Ok(session)
+    }
+    pub fn start_stream(&self) -> Result<(Run, String)> {
+        let project = self.ensure_project("ltrace:incoming", "Incoming traces")?;
+        let (mut run, token) = self.start_run(
+            &project.id,
+            "Live telemetry".into(),
+            "Direct OTLP export · no test attribution".into(),
+            "unavailable".into(),
+        )?;
+        run.test_status = "not_run".into();
+        self.connection()?.execute(
+            "UPDATE runs SET body=?2 WHERE id=?1",
+            params![run.id, json(&run)?],
+        )?;
+        Ok((run, token))
+    }
+    pub fn close_stream(&self, id: &str) -> Result<()> {
+        let conn = self.connection()?;
+        let mut run: Run = read_one(&conn, "SELECT body FROM runs WHERE id=?1", id)?;
+        run.finished_ms = Some(now_ms());
+        run.capture_status = if run.issues.is_empty() {
+            "settled"
+        } else {
+            "partial"
+        }
+        .into();
+        conn.execute(
+            "UPDATE runs SET body=?2 WHERE id=?1",
+            params![run.id, json(&run)?],
+        )?;
+        Ok(())
+    }
     pub fn start_run(
         &self,
         session_id: &str,
@@ -93,7 +148,22 @@ impl Store {
         command: String,
         revision: String,
     ) -> Result<(Run, String)> {
+        self.start_run_with_expectations(session_id, label, command, revision, None)
+    }
+    pub fn start_run_with_expectations(
+        &self,
+        session_id: &str,
+        label: String,
+        command: String,
+        revision: String,
+        expectations: Option<Vec<Expectation>>,
+    ) -> Result<(Run, String)> {
         let session = self.session(session_id)?;
+        let expectations = expectations.unwrap_or(session.expectations);
+        ensure!(expectations.len() <= 32, "at most 32 expectations");
+        for expectation in &expectations {
+            expectation.validate()?;
+        }
         ensure!(
             label.len() <= 200 && command.len() <= 2000 && revision.len() <= 200,
             "run metadata too long"
@@ -110,7 +180,7 @@ impl Store {
             test_status: "running".into(),
             capture_status: "collecting".into(),
             issues: vec![],
-            expectations: session.expectations,
+            expectations,
         };
         let token = Uuid::new_v4().to_string();
         self.connection()?.execute(
@@ -251,7 +321,9 @@ impl Store {
         let runs: Vec<Run> = read_many(&conn, "SELECT body FROM runs", [])?;
         for mut run in runs.into_iter().filter(|r| r.finished_ms.is_none()) {
             run.finished_ms = Some(now_ms());
-            run.test_status = "interrupted".into();
+            if run.test_status != "not_run" {
+                run.test_status = "interrupted".into();
+            }
             run.capture_status = "partial".into();
             add_issue(&mut run, "Receiver restarted before the run finished.");
             conn.execute(

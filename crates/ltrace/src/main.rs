@@ -73,7 +73,9 @@ enum Action {
     /// Run a real test with isolated local OTel export. Child output goes to stderr.
     Capture {
         #[arg(long)]
-        session: String,
+        session: Option<String>,
+        #[arg(long)]
+        expectations: Option<PathBuf>,
         #[arg(long, default_value = "Test run")]
         label: String,
         /// Safe description stored in history; arguments and output are never stored.
@@ -192,6 +194,7 @@ async fn run(args: Args) -> Result<i32> {
         }
         Action::Capture {
             session,
+            expectations,
             label,
             command_label,
             timeout_seconds,
@@ -200,7 +203,7 @@ async fn run(args: Args) -> Result<i32> {
         } => {
             return capture(
                 &client,
-                session,
+                (session, expectations),
                 label,
                 command_label,
                 timeout_seconds,
@@ -221,30 +224,56 @@ fn valid_id(id: &str) -> Result<()> {
 
 async fn capture(
     client: &Client,
-    session: String,
+    setup: (Option<String>, Option<PathBuf>),
     label: String,
     command_label: Option<String>,
     timeout: u64,
     settle: u64,
     argv: Vec<String>,
 ) -> Result<i32> {
-    valid_id(&session)?;
+    let (session, expectation_file) = setup;
     ensure!(
         (1..=3600).contains(&timeout) && settle <= 10_000,
         "timeout must be 1–3600 seconds; settle at most 10000 ms"
     );
     let cwd = std::env::current_dir()?.canonicalize()?;
-    let session_data = client.read(&format!("sessions/{session}")).await?;
-    let project = PathBuf::from(
-        session_data["session"]["project"]
+    let session = if let Some(session) = session {
+        valid_id(&session)?;
+        let data = client.read(&format!("sessions/{session}")).await?;
+        let project = PathBuf::from(
+            data["session"]["project"]
+                .as_str()
+                .context("missing project")?,
+        )
+        .canonicalize()?;
+        ensure!(
+            cwd.starts_with(project),
+            "run the capture command inside the selected project"
+        );
+        session
+    } else {
+        let root = Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+            .await;
+        let project = match root {
+            Ok(output) if output.status.success() => {
+                PathBuf::from(String::from_utf8(output.stdout)?.trim()).canonicalize()?
+            }
+            _ => cwd.clone(),
+        };
+        let project = client
+            .write("projects/ensure", json!({"project":project}))
+            .await?;
+        project["id"]
             .as_str()
-            .context("missing project")?,
-    )
-    .canonicalize()?;
-    ensure!(
-        cwd.starts_with(project),
-        "run the capture command inside the session's project directory"
-    );
+            .context("project ID missing")?
+            .to_owned()
+    };
+    let expectations: Vec<Expectation> = match expectation_file {
+        Some(path) => serde_json::from_slice(&std::fs::read(path)?)?,
+        None => vec![],
+    };
     let revision = revision().await;
     let description = command_label.unwrap_or_else(|| {
         format!(
@@ -258,7 +287,7 @@ async fn capture(
     let started = client
         .write(
             &format!("sessions/{session}/runs"),
-            json!({"label":label,"command":description,"revision":revision}),
+            json!({"label":label,"command":description,"revision":revision,"expectations":expectations}),
         )
         .await?;
     let id = started["run"]["id"].as_str().context("run ID missing")?;
