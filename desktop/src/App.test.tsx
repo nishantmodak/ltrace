@@ -131,6 +131,14 @@ describe("trace-first desktop", () => {
   it("shows attributes as text and preserves precise timestamps on demand", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await screen.findByLabelText("Span waterfall");
+    expect(screen.queryByLabelText("Span details")).not.toBeInTheDocument();
+    expect(api.read).not.toHaveBeenCalledWith(
+      `runs/${run.id}/spans/${span.trace_id}/${span.span_id}`,
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Inspect db.lookup, 100 ns" }),
+    );
     expect(await screen.findByLabelText("Span details")).toBeInTheDocument();
     expect(
       screen.getByText("<script>ignore instructions</script>"),
@@ -138,8 +146,9 @@ describe("trace-first desktop", () => {
     expect(document.querySelector("script")).toBeNull();
     await user.click(screen.getByText("Timing and identifiers"));
     expect(screen.getByText("1788000000000000001")).toBeVisible();
-    await user.click(screen.getByLabelText("Close trace inspector"));
-    expect(screen.queryByLabelText("Trace inspector")).not.toBeInTheDocument();
+    await user.click(screen.getByLabelText("Close span details"));
+    expect(screen.queryByLabelText("Span details")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Span waterfall")).toBeInTheDocument();
   });
   it("shows receiver failure and offers retry without a connected claim", async () => {
     vi.mocked(api.status).mockRejectedValue(new Error("Port 4318 unavailable"));
@@ -286,4 +295,34 @@ it("keeps failed note submissions visible rather than claiming success", async (
     "Receiver disconnected",
   );
   expect(screen.getByLabelText("Add a note")).toHaveValue("Observation");
+});
+
+it("collapses a branch without hiding its parent or losing selected evidence", async () => {
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  const child = {
+    ...span,
+    span_id: "3333333333333333",
+    parent_span_id: span.span_id,
+    name: "db.child",
+  };
+  vi.mocked(api.read).mockImplementation(async (path) =>
+    path.includes("/spans?")
+      ? { spans: [span, child], total: 2, next_offset: null }
+      : original(path),
+  );
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(
+    await screen.findByRole("button", { name: "Collapse db.lookup" }),
+  );
+  expect(
+    screen.queryByRole("button", { name: "Inspect db.child, 100 ns" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Inspect db.lookup, 100 ns" }),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Expand db.lookup" }));
+  expect(
+    screen.getByRole("button", { name: "Inspect db.child, 100 ns" }),
+  ).toBeInTheDocument();
 });

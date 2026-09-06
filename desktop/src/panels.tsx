@@ -111,20 +111,19 @@ export function TracePanel({
   runId,
   trace,
   requestedSpan,
-  onClose,
 }: {
   runId: string;
   trace: Trace;
   requestedSpan: string | null;
-  onClose: () => void;
 }) {
-  const [spanId, setSpanId] = useState(trace.root_span_id);
+  const [spanId, setSpanId] = useState<string | null>(requestedSpan);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [extra, setExtra] = useState<Span[]>([]);
   const [next, setNext] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    setSpanId(requestedSpan ?? trace.root_span_id);
+    setSpanId(requestedSpan);
     setExtra([]);
     setNext(null);
     setError("");
@@ -139,7 +138,7 @@ export function TracePanel({
     setNext(page.data?.next_offset ?? null);
   }, [page.data]);
   const inspected = useLive<Inspected>(
-    `${runId}:${trace.trace_id}:${spanId}`,
+    spanId ? `${runId}:${trace.trace_id}:${spanId}` : null,
     () => api.read(`runs/${runId}/spans/${trace.trace_id}/${spanId}`),
     0,
   );
@@ -164,77 +163,150 @@ export function TracePanel({
       setBusy(false);
     }
   }
+  const ordered = orderedSpans(spans);
+  const parents = new Map(spans.map((s) => [s.span_id, s.parent_span_id]));
+  const branches = new Set(spans.map((s) => s.parent_span_id));
+  const visible = ordered.filter(({ span }) => {
+    const seen = new Set<string>([span.span_id]);
+    let parent = span.parent_span_id;
+    while (parent && !seen.has(parent)) {
+      if (collapsed.has(parent)) return false;
+      seen.add(parent);
+      parent = parents.get(parent) ?? "";
+    }
+    return true;
+  });
+  // Use the complete trace bounds even when only a page of spans is loaded.
+  const bounds = {
+    trace_id: trace.trace_id,
+    start_ns: trace.start_ns,
+    end_ns: (
+      BigInt(trace.start_ns) + BigInt(trace.duration_ns ?? "0")
+    ).toString(),
+  } as Span;
   return (
-    <aside className="trace-panel" aria-label="Trace inspector">
-      <header>
-        <div>
-          <h2>{trace.name}</h2>
-          <span>
-            {trace.services.join(", ")} <b>·</b> {duration(trace.duration_ns)}{" "}
-            <b>·</b> {trace.span_count} spans
-          </span>
+    <div className="trace-view">
+      <section className="trace-panel" aria-label="Trace inspector">
+        <header>
+          <div>
+            <h2>{trace.name}</h2>
+            <span>
+              {trace.services.join(", ")} <b>·</b> {duration(trace.duration_ns)}{" "}
+              <b>·</b> {trace.span_count} spans
+            </span>
+          </div>
+        </header>
+        <div className="trace-reference">
+          Trace <code>{trace.trace_id}</code>
         </div>
-        <button
-          className="icon-button"
-          aria-label="Close trace inspector"
-          onClick={onClose}
-        >
-          ×
-        </button>
-      </header>
-      <div className="trace-reference">
-        Trace <code>{trace.trace_id}</code>
-      </div>
-      {(page.error || inspected.error || error) && (
-        <div className="error-banner" role="alert">
-          {page.error || inspected.error || error}
-        </div>
-      )}
-      <div className="waterfall">
-        <div className="waterfall-head">
-          <span>Span</span>
-          <span>Duration</span>
-        </div>
-        {orderedSpans(spans).map(({ span, depth }) => {
-          const bar = timeline(span, spans);
-          return (
-            <button
-              key={span.span_id}
-              className={`span-row ${spanId === span.span_id ? "selected" : ""}`}
-              onClick={() => setSpanId(span.span_id)}
-            >
-              <span
-                className="span-name"
-                style={{ paddingLeft: 10 + depth * 12 }}
-              >
-                <span className={`dot ${span.error ? "error" : "neutral"}`} />
-                {span.name}
-              </span>
-              <span className="bar-track">
-                <i style={{ left: `${bar.left}%`, width: `${bar.width}%` }} />
-              </span>
-              <span className="span-duration">{spanDuration(span)}</span>
-            </button>
-          );
-        })}
-        {next !== null && (
-          <button
-            className="load-more"
-            disabled={busy}
-            onClick={() => void more()}
-          >
-            Load more spans ({spans.length} of {trace.span_count})
-          </button>
+        {(page.error || error) && (
+          <div className="error-banner" role="alert">
+            {page.error || error}
+          </div>
         )}
-      </div>
-      {inspected.data ? (
-        <SpanDetails inspected={inspected.data} />
-      ) : (
-        <div className="list-empty">Loading span…</div>
+        <div className="waterfall" aria-label="Span waterfall">
+          <div className="waterfall-head">
+            <span>Operation</span>
+            <span className="timeline-axis">
+              <span>0</span>
+              <span>{duration(trace.duration_ns)}</span>
+            </span>
+            <span>Duration</span>
+          </div>
+          {visible.map(({ span, depth }) => {
+            const bar = timeline(span, [bounds]);
+            const branch = branches.has(span.span_id);
+            return (
+              <div
+                key={span.span_id}
+                className={`span-row ${spanId === span.span_id ? "selected" : ""}`}
+              >
+                <div
+                  className="span-name"
+                  style={{ paddingLeft: 8 + depth * 12 }}
+                >
+                  {branch ? (
+                    <button
+                      className="branch-toggle"
+                      aria-label={`${collapsed.has(span.span_id) ? "Expand" : "Collapse"} ${span.name}`}
+                      aria-expanded={!collapsed.has(span.span_id)}
+                      onClick={() =>
+                        setCollapsed((old) => {
+                          const next = new Set(old);
+                          if (next.has(span.span_id)) next.delete(span.span_id);
+                          else next.add(span.span_id);
+                          return next;
+                        })
+                      }
+                    >
+                      {collapsed.has(span.span_id) ? "›" : "⌄"}
+                    </button>
+                  ) : (
+                    <span className="branch-spacer" />
+                  )}
+                  <button
+                    className="span-select"
+                    title={`${span.name} · ${span.service}`}
+                    onClick={() => setSpanId(span.span_id)}
+                  >
+                    <span
+                      className={`dot ${span.error ? "error" : "neutral"}`}
+                    />
+                    <span>{span.name}</span>
+                  </button>
+                </div>
+                <button
+                  className="bar-track"
+                  aria-label={`Inspect ${span.name}, ${spanDuration(span)}`}
+                  onClick={() => setSpanId(span.span_id)}
+                >
+                  <i
+                    className={span.error ? "error-bar" : ""}
+                    style={{ left: `${bar.left}%`, width: `${bar.width}%` }}
+                  />
+                </button>
+                <span className="span-duration">{spanDuration(span)}</span>
+              </div>
+            );
+          })}
+          {next !== null && (
+            <button
+              className="load-more"
+              disabled={busy}
+              onClick={() => void more()}
+            >
+              Load more spans ({spans.length} of {trace.span_count})
+            </button>
+          )}
+        </div>
+      </section>
+      {spanId && (
+        <aside className="span-inspector" aria-label="Selected span">
+          <header>
+            <span>Span details</span>
+            <button
+              className="icon-button"
+              aria-label="Close span details"
+              onClick={() => setSpanId(null)}
+            >
+              ×
+            </button>
+          </header>
+          {inspected.error ? (
+            <div className="error-banner" role="alert">
+              {inspected.error}
+            </div>
+          ) : inspected.data ? (
+            <SpanDetails inspected={inspected.data} />
+          ) : (
+            <div className="list-empty">Loading span…</div>
+          )}
+        </aside>
       )}
-    </aside>
+    </div>
   );
 }
+
 function SpanDetails({ inspected }: { inspected: Inspected }) {
   const span = inspected.span;
   const attributes = Array.isArray(span.raw.attributes)

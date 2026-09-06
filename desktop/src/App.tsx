@@ -43,7 +43,6 @@ export default function App() {
   const [requestedSpan, setRequestedSpan] = useState<string | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [showRun, setShowRun] = useState(false);
-  const [showInspector, setShowInspector] = useState(true);
   useEffect(() => {
     setSelectedTrace(null);
     setRequestedSpan(null);
@@ -83,80 +82,26 @@ export default function App() {
     setSelectedTrace(trace);
     setRequestedSpan(span);
     setShowRun(false);
-    setShowInspector(true);
   }
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <svg viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M4 3v14h13M8 7h9M8 12h6" />
-          </svg>
-          <span>ltrace</span>
-        </div>
-        <div className="nav-label">Projects</div>
-        <nav aria-label="Projects">
-          {projects.data?.sessions.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => switchProject(p.id)}
-              className={project === p.id ? "active" : ""}
-            >
-              <span className="project-icon">
-                {p.project === "ltrace:incoming" ? "↙" : "▧"}
-              </span>
-              <span title={p.project}>{p.title}</span>
-            </button>
-          ))}
-        </nav>
-        {!projects.data?.sessions.length && (
-          <p className="sidebar-help">Projects appear as traces arrive.</p>
-        )}
-        <button
-          className="receiver-button"
-          onClick={() => setShowConnection(true)}
-        >
-          <span
-            className={`dot ${connection.data && !connection.error ? "ok" : "warning"}`}
-          />
-          <span>
-            {connection.data && !connection.error
-              ? "Receiver connected"
-              : "Receiver unavailable"}
-            <small>
-              {connection.data?.url.replace("http://", "") ??
-                "Connection details"}
-            </small>
-          </span>
-          <span>⌘</span>
-        </button>
-      </aside>
       <main>
         <header className="toolbar">
-          <div className="breadcrumb">
-            <strong>Traces</strong>
-            {detail.data && (
-              <>
-                <span>/</span>
-                <span>{detail.data.session.title}</span>
-              </>
-            )}
+          <div className="brand">
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M4 3v14h13M8 7h9M8 12h6" />
+            </svg>
+            <span>ltrace</span>
           </div>
           <div className="toolbar-actions">
-            {detail.data?.runs.length ? (
-              <select
-                aria-label="Run"
-                value={selectedRun}
-                onChange={(e) => setSelectedRun(e.target.value)}
-              >
-                <option value="latest">Latest run</option>
-                {detail.data.runs.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            ) : null}
+            <span className="connection-status">
+              <span
+                className={`dot ${connection.data && !connection.error ? "ok" : "warning"}`}
+              />
+              {connection.data && !connection.error
+                ? "Receiver connected"
+                : "Receiver unavailable"}
+            </span>
             <button
               aria-label="Connection details"
               className="icon-button"
@@ -182,7 +127,7 @@ export default function App() {
             </button>
           </div>
         )}
-        {!runId ? (
+        {!runId && !projects.data?.sessions.length ? (
           <div className="empty-state">
             <h1>Waiting for traces</h1>
             <p>
@@ -202,66 +147,102 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className="run-context">
-              <div>
-                {report.data?.run.test_status === "not_run" ? (
-                  <>
-                    <span className="dot live" />
-                    Live telemetry{" "}
-                    <span className="muted">· Not linked to a test</span>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className={`dot ${report.data?.run.test_status === "passed" ? "ok" : "warning"}`}
-                    />
-                    <span>{report.data?.run.label ?? "Loading run…"}</span>
-                    <span className="muted">
-                      · Test {report.data?.run.test_status ?? "running"}
-                    </span>
-                    {failures > 0 && (
-                      <button
-                        className="failed-text"
-                        onClick={() => setShowRun(true)}
-                      >
-                        · {failures} expectation{failures === 1 ? "" : "s"}{" "}
-                        failed
-                      </button>
-                    )}
-                    {!failures && unknown > 0 && (
-                      <button
-                        className="muted"
-                        onClick={() => setShowRun(true)}
-                      >
-                        · {unknown} unverified
-                      </button>
-                    )}
-                    {!failures &&
-                      !unknown &&
-                      !!report.data?.verification.length && (
-                        <span className="ok-text">· Expectations passed</span>
+            {runId && (
+              <div className="run-context">
+                <div>
+                  {report.data?.run.test_status === "not_run" ? (
+                    <>
+                      <span className="dot live" />
+                      Live telemetry{" "}
+                      <span className="muted">· Not linked to a test</span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className={`dot ${report.data?.run.test_status === "passed" ? "ok" : "warning"}`}
+                      />
+                      <span>{report.data?.run.label ?? "Loading run…"}</span>
+                      <span className="muted">
+                        · Test {report.data?.run.test_status ?? "running"}
+                      </span>
+                      {failures > 0 && (
+                        <button
+                          className="failed-text"
+                          onClick={() => setShowRun(true)}
+                        >
+                          · {failures} expectation{failures === 1 ? "" : "s"}{" "}
+                          failed
+                        </button>
                       )}
-                  </>
-                )}
-                {!!report.data?.issues.length && (
-                  <button
-                    className="warning-text"
-                    onClick={() => setShowRun(true)}
-                  >
-                    · Capture needs attention
-                  </button>
-                )}
+                      {!failures && unknown > 0 && (
+                        <button
+                          className="muted"
+                          onClick={() => setShowRun(true)}
+                        >
+                          · {unknown} unverified
+                        </button>
+                      )}
+                      {!failures &&
+                        !unknown &&
+                        !!report.data?.verification.length && (
+                          <span className="ok-text">· Expectations passed</span>
+                        )}
+                    </>
+                  )}
+                  {!!report.data?.issues.length && (
+                    <button
+                      className="warning-text"
+                      onClick={() => setShowRun(true)}
+                    >
+                      · Capture needs attention
+                    </button>
+                  )}
+                </div>
+                <button
+                  className="text-button"
+                  onClick={() => setShowRun(true)}
+                >
+                  Run details
+                </button>
               </div>
-              <button className="text-button" onClick={() => setShowRun(true)}>
-                Run details
-              </button>
-            </div>
+            )}
             <div className="trace-workspace">
               <section className="trace-list" aria-label="Trace list">
+                <div className="trace-filters">
+                  <label>
+                    Project
+                    <select
+                      aria-label="Project"
+                      value={project ?? ""}
+                      onChange={(e) => switchProject(e.target.value)}
+                    >
+                      {projects.data?.sessions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Run
+                    <select
+                      aria-label="Run"
+                      value={selectedRun}
+                      onChange={(e) => setSelectedRun(e.target.value)}
+                    >
+                      <option value="latest">Latest run</option>
+                      {detail.data?.runs.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="list-tools">
                   <input
                     aria-label="Search traces"
-                    placeholder="Search by operation, service, or trace ID"
+                    placeholder="Search traces…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
@@ -271,50 +252,39 @@ export default function App() {
                   </span>
                 </div>
                 <div className="trace-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Request</th>
-                        <th>Duration</th>
-                        <th>Spans</th>
-                        <th>Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {traces.data?.traces.map((t) => (
-                        <tr
-                          key={t.trace_id}
-                          className={
-                            selected?.trace_id === t.trace_id && showInspector
-                              ? "selected"
-                              : ""
-                          }
-                        >
-                          <td>
-                            <button
-                              className="trace-name"
-                              onClick={() => {
-                                setSelectedTrace(t.trace_id);
-                                setRequestedSpan(null);
-                                setShowInspector(true);
-                              }}
-                            >
-                              <span
-                                className={`dot ${t.errors ? "error" : "neutral"}`}
-                              />
-                              <span>
-                                <strong>{t.name || "Unnamed span"}</strong>
-                                <small>{t.services.join(", ")}</small>
-                              </span>
-                            </button>
-                          </td>
-                          <td>{duration(t.duration_ns)}</td>
-                          <td>{t.span_count}</td>
-                          <td>{timeOf(t.start_ns)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="trace-items">
+                    {traces.data?.traces.map((t) => (
+                      <button
+                        key={t.trace_id}
+                        className={`trace-item ${selected?.trace_id === t.trace_id ? "selected" : ""}`}
+                        aria-pressed={selected?.trace_id === t.trace_id}
+                        onClick={() => {
+                          setSelectedTrace(t.trace_id);
+                          setRequestedSpan(null);
+                        }}
+                      >
+                        <span className="trace-item-title">
+                          <span
+                            className={`dot ${t.errors ? "error" : "neutral"}`}
+                          />
+                          <strong title={t.name}>
+                            {t.name || "Unnamed span"}
+                          </strong>
+                          <span>{duration(t.duration_ns)}</span>
+                        </span>
+                        <span className="trace-item-service">
+                          {t.services.join(", ")}
+                        </span>
+                        <span className="trace-item-meta">
+                          <span>{timeOf(t.start_ns)}</span>
+                          <span>
+                            {t.span_count} spans
+                            {t.errors ? ` · ${t.errors} errors` : ""}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                   {traces.data?.traces.length === 0 && (
                     <div className="list-empty">
                       {search
@@ -333,13 +303,17 @@ export default function App() {
                     )}
                 </div>
               </section>
-              {showInspector && selected && (
+              {runId && selected ? (
                 <TracePanel
+                  key={`${runId}:${selected.trace_id}`}
                   runId={runId}
                   trace={selected}
                   requestedSpan={requestedSpan}
-                  onClose={() => setShowInspector(false)}
                 />
+              ) : (
+                <div className="waterfall-empty">
+                  Select a trace to inspect its waterfall.
+                </div>
               )}
             </div>
           </>
