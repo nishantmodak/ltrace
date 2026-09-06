@@ -119,7 +119,7 @@ fn print(value: &Value) -> Result<()> {
 }
 
 async fn run(args: Args) -> Result<i32> {
-    let dir = args.home.unwrap_or(local::data_dir()?);
+    let dir = local::resolve_home(args.home)?;
     if let Action::Serve { port } = args.command {
         let server = local::start(&dir, port).await?;
         eprintln!(

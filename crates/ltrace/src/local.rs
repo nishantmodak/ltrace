@@ -16,13 +16,29 @@ use tokio::{net::TcpListener, task::JoinHandle};
 use uuid::Uuid;
 
 pub fn data_dir() -> Result<PathBuf> {
-    if let Some(path) = std::env::var_os("LTRACE_HOME") {
-        return Ok(path.into());
+    resolve_home_with(None, default_platform_dirs)
+}
+
+pub fn resolve_home(override_: Option<PathBuf>) -> Result<PathBuf> {
+    resolve_home_with(override_, default_platform_dirs)
+}
+
+fn default_platform_dirs() -> Option<PathBuf> {
+    directories::ProjectDirs::from("dev", "ltrace", "ltrace")
+        .map(|d| d.data_local_dir().to_path_buf())
+}
+
+pub fn resolve_home_with(
+    override_: Option<PathBuf>,
+    platform_dirs: fn() -> Option<PathBuf>,
+) -> Result<PathBuf> {
+    if let Some(p) = override_ {
+        return Ok(p);
     }
-    Ok(directories::ProjectDirs::from("dev", "ltrace", "ltrace")
-        .context("cannot locate application data directory")?
-        .data_local_dir()
-        .into())
+    if let Some(p) = std::env::var_os("LTRACE_HOME").map(PathBuf::from) {
+        return Ok(p);
+    }
+    platform_dirs().context("cannot locate application data directory")
 }
 
 #[derive(Clone, Serialize, Deserialize)]
