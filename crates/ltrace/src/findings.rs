@@ -34,6 +34,11 @@ fn attr(span: &Span, keys: &[&str]) -> Option<String> {
         })
     })
 }
+fn retry_counter(span: &Span) -> Option<u64> {
+    ["retry.attempt", "http.request.resend_count"]
+        .iter()
+        .find_map(|key| attr(span, &[*key])?.parse().ok())
+}
 fn finding(
     kind: &'static str,
     title: String,
@@ -109,9 +114,7 @@ pub fn detect(spans: &[Span]) -> Report {
             slow.push(span);
         }
         // Explicit retry metadata avoids mistaking similar span names for retries.
-        let attempt = attr(span, &["retry.attempt"]).and_then(|n| n.parse::<u64>().ok());
-        let resend = attr(span, &["http.request.resend_count"]).and_then(|n| n.parse::<u64>().ok());
-        if (attempt.is_some() || resend.is_some()) && !span.parent_span_id.is_empty() {
+        if retry_counter(span).is_some() && !span.parent_span_id.is_empty() {
             retries
                 .entry((
                     span.trace_id.clone(),
@@ -134,10 +137,7 @@ pub fn detect(spans: &[Span]) -> Report {
             "Inspect the individual spans and compare equivalent workloads before deciding whether to optimize.",&slow));
     }
     for group in retries.values() {
-        let attempts: BTreeSet<_> = group
-            .iter()
-            .filter_map(|s| attr(s, &["retry.attempt", "http.request.resend_count"]))
-            .collect();
+        let attempts: BTreeSet<_> = group.iter().filter_map(|s| retry_counter(s)).collect();
         if attempts.len() >= 2 && group.iter().any(|s| s.error) {
             findings.push(finding("retry_after_failure",format!("Retry after failure · {} attempts",attempts.len()),
                 "Sibling spans include distinct explicit attempt counters and at least one failed attempt. A retry may be expected recovery; inspect the failure before changing retry behavior.".into(),
