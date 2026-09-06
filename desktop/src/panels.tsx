@@ -158,8 +158,8 @@ export function TracePanel({
     0,
   );
   const spans = [...(page.data?.spans ?? []), ...extra];
-  const selection = useRef(`${runId}:${trace.trace_id}`);
-  selection.current = `${runId}:${trace.trace_id}`;
+  const selection = useRef(`${runId}:${trace.trace_id}:${trace.span_count}`);
+  selection.current = `${runId}:${trace.trace_id}:${trace.span_count}`;
   async function more() {
     if (next === null) return;
     const key = selection.current;
