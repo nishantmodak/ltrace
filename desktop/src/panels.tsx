@@ -449,6 +449,8 @@ export function RunDialog({
               </p>
               {summary.issues.length ||
               baseline.data.issues.length ||
+              summary.run.capture_status !== "settled" ||
+              baseline.data.run.capture_status !== "settled" ||
               summary.operations_total > 100 ||
               baseline.data.operations_total > 100 ? (
                 <p className="warning-text">
