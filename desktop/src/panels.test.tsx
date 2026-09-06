@@ -84,9 +84,7 @@ async function mount(node: React.ReactElement) {
 }
 
 describe("TracePanel 'Load more' staleness", () => {
-  it(
-    "drops an in-flight 'Load more' response when the live trace grows (span_count changes)",
-    async () => {
+  it("drops an in-flight 'Load more' response when the live trace grows (span_count changes)", async () => {
     let resolveMore!: (value: SpanPage) => void;
     const morePromise = new Promise<SpanPage>((resolve) => {
       resolveMore = resolve;
@@ -145,9 +143,7 @@ describe("TracePanel 'Load more' staleness", () => {
     expect(kept).not.toBeDisabled();
     expect(screen.queryByText("span-200")).not.toBeInTheDocument();
     expect(screen.queryByText("span-249")).not.toBeInTheDocument();
-  },
-  15000,
-  );
+  }, 15000);
 
   it("applies a fresh 'Load more' response when span_count is unchanged", async () => {
     vi.mocked(api.read).mockImplementation(async (path: string) => {
