@@ -107,6 +107,7 @@ export default function App() {
                 detail.refresh();
                 report.refresh();
                 traces.refresh();
+                referenced.refresh();
               }}
             >
               Retry
