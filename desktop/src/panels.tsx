@@ -10,6 +10,7 @@ import {
   spanDuration,
   timeline,
   type Connection,
+  type FindingsReport,
   type Inspected,
   type SessionDetail,
   type Span,
@@ -117,6 +118,20 @@ export function TracePanel({
   requestedSpan: string | null;
 }) {
   const [spanId, setSpanId] = useState<string | null>(requestedSpan);
+  const [findingId, setFindingId] = useState<string | null>(null);
+  const findings = useLive<FindingsReport>(
+    `${runId}:${trace.trace_id}:${trace.span_count}:findings`,
+    () => api.read(`runs/${runId}/traces/${trace.trace_id}/findings`),
+    0,
+  );
+  const activeFinding = findings.data?.findings.find((f) => f.id === findingId);
+  const highlighted = new Set(activeFinding?.span_ids ?? []);
+  useEffect(() => {
+    if (spanId)
+      document
+        .querySelector(`[data-span-id="${spanId}"]`)
+        ?.scrollIntoView?.({ block: "nearest" });
+  }, [findingId, spanId]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [extra, setExtra] = useState<Span[]>([]);
   const [next, setNext] = useState<number | null>(null);
@@ -204,6 +219,52 @@ export function TracePanel({
             {page.error || error}
           </div>
         )}
+        <section className="findings-strip" aria-label="Trace findings">
+          <div className="findings-label">
+            Findings{" "}
+            {findings.data && <span>{findings.data.findings.length}</span>}
+          </div>
+          {findings.error ? (
+            <p role="alert">
+              {findings.error}{" "}
+              <button className="text-button" onClick={findings.refresh}>
+                Retry findings
+              </button>
+            </p>
+          ) : findings.data ? (
+            <>
+              <div className="finding-chips">
+                {findings.data.findings.map((finding) => (
+                  <button
+                    key={finding.id}
+                    className={`finding-chip ${finding.id === findingId ? "active" : ""}`}
+                    aria-pressed={finding.id === findingId}
+                    onClick={() => {
+                      setFindingId(finding.id);
+                      setSpanId(finding.span_ids[0] ?? null);
+                      setCollapsed(new Set());
+                    }}
+                  >
+                    {finding.title}
+                  </button>
+                ))}
+              </div>
+              {!findings.data.findings.length && (
+                <p>No findings in recorded spans.</p>
+              )}
+              {!!findings.data.limitations.length && (
+                <details className="finding-limits">
+                  <summary>Detection limits</summary>
+                  {findings.data.limitations.map((limit) => (
+                    <p key={limit}>{limit}</p>
+                  ))}
+                </details>
+              )}
+            </>
+          ) : (
+            <p>Checking recorded spans…</p>
+          )}
+        </section>
         <div className="waterfall" aria-label="Span waterfall">
           <div className="waterfall-head">
             <span>Operation</span>
@@ -219,7 +280,8 @@ export function TracePanel({
             return (
               <div
                 key={span.span_id}
-                className={`span-row ${spanId === span.span_id ? "selected" : ""}`}
+                data-span-id={span.span_id}
+                className={`span-row ${spanId === span.span_id ? "selected" : ""} ${highlighted.has(span.span_id) ? "finding-match" : ""}`}
               >
                 <div
                   className="span-name"
@@ -293,11 +355,42 @@ export function TracePanel({
             <button
               className="icon-button"
               aria-label="Close span details"
-              onClick={() => setSpanId(null)}
+              onClick={() => {
+                setSpanId(null);
+                setFindingId(null);
+              }}
             >
               ×
             </button>
           </header>
+          {activeFinding && (
+            <section
+              className="finding-explanation"
+              aria-label="Finding evidence"
+            >
+              <h3>{activeFinding.title}</h3>
+              <p>{activeFinding.explanation}</p>
+              <p>{activeFinding.suggestion}</p>
+              <div className="finding-evidence-links">
+                {activeFinding.span_ids.slice(0, 20).map((id, i) => (
+                  <button
+                    key={id}
+                    aria-label={`Inspect evidence span ${i + 1}`}
+                    aria-pressed={spanId === id}
+                    onClick={() => setSpanId(id)}
+                  >
+                    Span {i + 1}
+                  </button>
+                ))}
+              </div>
+              {activeFinding.span_count > 20 && (
+                <p>
+                  Showing the first 20 evidence links.{" "}
+                  {activeFinding.span_count} spans matched.
+                </p>
+              )}
+            </section>
+          )}
           {inspected.error ? (
             <div className="error-banner" role="alert">
               {inspected.error}

@@ -12,6 +12,7 @@ ltrace-dev doctor
 ltrace-dev capture --label "Baseline" --expectations expectations.json -- your-test-command
 ltrace-dev show run RUN_ID
 ltrace-dev traces RUN_ID --search catalog
+ltrace-dev findings RUN_ID TRACE_ID
 ltrace-dev spans RUN_ID --offset 0 --limit 100
 ltrace-dev spans RUN_ID --trace TRACE_ID --limit 100
 ltrace-dev span RUN_ID TRACE_ID SPAN_ID
@@ -34,6 +35,12 @@ The reader commands do not run application code or mutate evidence. `capture` ru
 `capture` forwards child output to stderr and emits the report on stdout. Its exit code preserves the test result. Runtime expectation failures live in JSON and do not replace the test exit code. Interrupted/spawn-failed tests and collector failure after successful tests return 2. If the collector fails, do not discard the actual test outcome or imply telemetry was verified.
 
 Span pages contain `spans`, `total`, and `next_offset`; limits are 1–200. Page through settled captures. Arrival of new spans can change offset pagination during a live stream, so check counts and capture state. Raw spans preserve exact string IDs and nanosecond timestamps, attributes, events, links, resources and scope. A span lookup also returns `uncovered_recorded_ns`: parent time minus the union of clipped direct-child intervals, not CPU usage or proven waiting.
+
+## Findings report
+
+`findings RUN_ID TRACE_ID` returns `findings`, `analyzed_spans`, and `limitations`. Each finding has `kind`, `title`, `explanation`, `suggestion`, `span_count`, and `span_ids`. Use the same run/trace IDs with `span` to inspect these references. Output is bounded to 50 findings and 200 references per finding; counts retain all observed matches.
+
+Rules: five or more SQL spans with identical recorded query text, service and parent; SQL duration at least 100 ms or HTTP duration at least 250 ms; distinct explicit retry counters among siblings with an observed failure. SQL literal variants are not normalized. Repetition may be intentional, thresholds are starting points, and successful recovery may need no fix. Absence of findings does not prove sufficient instrumentation or correct behavior.
 
 ## Interpretation
 

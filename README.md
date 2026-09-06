@@ -67,6 +67,16 @@ An expectation specifies an exact service/operation, count range, and source-bac
 
 Give your coding agent [the companion skill](skills/ltrace-debug/SKILL.md). It describes how to instrument, run, inspect, fix, and verify using the implemented commands. Skill loading depends on the coding agent's configuration; ltrace does not claim to force an agent to inspect evidence.
 
+## Automatic findings
+
+Each selected trace is checked for repeated SQL, slow dependencies, and retries. Findings appear above its waterfall, with the same JSON available to coding agents:
+
+```sh
+ltrace-dev findings RUN_ID TRACE_ID
+```
+
+The initial rules are deliberately explicit: at least five sibling database spans with identical recorded `db.query.text`/`db.statement`, SQL spans taking at least 100 ms or HTTP spans taking at least 250 ms, and sibling attempts with distinct `retry.attempt`/`http.request.resend_count` values and an observed failure. Query literals are not normalized. These are investigation leads, not proof that batching or changing retry behavior is correct. Missing attributes and capture problems are shown as detection limits; no findings is not a correctness guarantee.
+
 ## Inspect small and complex demo traces
 
 With the desktop open, run `python3 scripts/demo_traces.py`. This sends two explicitly **synthetic** examples through the local OTLP receiver:
@@ -74,7 +84,7 @@ With the desktop open, run `python3 scripts/demo_traces.py`. This sends two expl
 - **Demo · Health check** — 3 spans, 24 ms, one service.
 - **Demo · Checkout** — 30 spans, 1.2 s, four services, parallel inventory/cart/shipping work, twelve repeated lookups, and a payment timeout followed by a successful retry.
 
-Select either request in the left list. Expand/collapse branches, click a timeline bar for its attributes, and inspect the failed payment span's exception event. Both carry `demo.synthetic=true`; durations are designed fixtures, not performance measurements. These examples illustrate patterns; automatic N+1 detection is not implemented yet. Use `--port` for a non-default local receiver.
+Select either request in the left list. Expand/collapse branches, click a timeline bar for its attributes, and inspect the failed payment span's exception event. Both carry `demo.synthetic=true`; durations are designed fixtures, not performance measurements. Select Checkout to see automatic findings above its waterfall: possible N+1 (12 queries), slow dependencies (2 spans), and retry after failure (2 attempts). Click a finding to highlight evidence and inspect its explanation. Use `--port` for a non-default local receiver.
 
 ## Try a real reproduction
 

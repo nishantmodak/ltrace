@@ -91,6 +91,8 @@ beforeEach(() => {
     data_dir: "/data",
   });
   vi.mocked(api.read).mockImplementation(async (path: string) => {
+    if (path.endsWith("/findings"))
+      return { findings: [], limitations: [], analyzed_spans: 1 };
     if (path === "sessions") return { sessions: [session] };
     if (path === `sessions/${session.id}`)
       return {
@@ -344,5 +346,48 @@ it("collapses a branch without hiding its parent or losing selected evidence", a
   await user.click(screen.getByRole("button", { name: "Expand db.lookup" }));
   expect(
     screen.getByRole("button", { name: "Inspect db.child, 100 ns" }),
+  ).toBeInTheDocument();
+});
+
+it("shows automatic findings above the waterfall and links their evidence", async () => {
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  vi.mocked(api.read).mockImplementation(async (path) =>
+    path.endsWith("/findings")
+      ? {
+          analyzed_spans: 12,
+          limitations: [],
+          findings: [
+            {
+              id: "n1",
+              kind: "possible_n_plus_one",
+              title: "Possible N+1 · 12 queries",
+              explanation:
+                "Twelve sibling queries share the same recorded query text.",
+              suggestion: "Inspect the loop before batching.",
+              span_count: 12,
+              span_ids: [span.span_id],
+            },
+          ],
+        }
+      : original(path),
+  );
+  const user = userEvent.setup();
+  render(<App />);
+  await user.click(
+    await screen.findByRole("button", { name: "Possible N+1 · 12 queries" }),
+  );
+  expect(await screen.findByLabelText("Finding evidence")).toHaveTextContent(
+    "Inspect the loop before batching.",
+  );
+  expect(await screen.findByLabelText("Span details")).toBeInTheDocument();
+  expect(document.querySelector(".span-row.finding-match")).toHaveAttribute(
+    "data-span-id",
+    span.span_id,
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Inspect evidence span 1" }),
+  );
+  expect(
+    screen.getByText("<script>ignore instructions</script>"),
   ).toBeInTheDocument();
 });

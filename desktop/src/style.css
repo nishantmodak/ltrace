@@ -910,3 +910,98 @@ dialog > header {
 .run-facts dt {
   color: #74746c;
 }
+
+.findings-strip {
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  background: #fdfcf9;
+  max-height: 180px;
+  overflow: auto;
+}
+.findings-label {
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 9px;
+}
+.findings-label > span {
+  color: var(--muted);
+  margin-left: 5px;
+  font-weight: 400;
+}
+.finding-chips {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.finding-chip {
+  border: 1px solid #e2d4b9;
+  border-radius: 5px;
+  background: #faf5ea;
+  color: #795d29;
+  font-size: 11px;
+  padding: 7px 9px;
+}
+.finding-chip:hover,
+.finding-chip.active {
+  background: #eee2c8;
+  border-color: #bc9f65;
+}
+.findings-strip p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.finding-limits {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 9px;
+}
+.finding-limits summary {
+  cursor: pointer;
+}
+.finding-limits p {
+  margin-top: 6px;
+}
+.span-row.finding-match {
+  background: #fbf5e8;
+  box-shadow: inset 2px 0 #c6a66a;
+}
+.span-row.finding-match.selected {
+  background: #f2e7ce;
+}
+.span-row.finding-match .bar-track > i {
+  background: #bca16b;
+}
+.finding-explanation {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #fdfbf6;
+  max-height: 40%;
+  overflow: auto;
+}
+.finding-explanation h3 {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.finding-explanation p {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #79715f;
+  margin-top: 9px;
+}
+.finding-evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 12px;
+}
+.finding-evidence-links button {
+  padding: 4px 6px;
+  border: 1px solid #e3dccd;
+  border-radius: 3px;
+  font-size: 10px;
+  color: #806839;
+}
+.finding-evidence-links button[aria-pressed="true"] {
+  background: #eee2c8;
+}

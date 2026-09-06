@@ -277,3 +277,18 @@ export type RecentTracePage = {
   total: number;
   next_offset: number | null;
 };
+
+export type Finding = {
+  id: string;
+  kind: string;
+  title: string;
+  explanation: string;
+  suggestion: string;
+  span_count: number;
+  span_ids: string[];
+};
+export type FindingsReport = {
+  findings: Finding[];
+  limitations: string[];
+  analyzed_spans: number;
+};

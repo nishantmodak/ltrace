@@ -11,7 +11,7 @@ Own the local development loop: establish expectations, add targeted OTel instru
 
 The implemented reader is the `ltrace-dev` CLI, bundled with the desktop app or installed from this repository. The desktop's **Connection details** provides the exact executable and data-directory arguments. Run `ltrace-dev --version` and `ltrace-dev doctor` (with `--home` if provided) to verify the product and receiver. Do not confuse it with Linux's unrelated `ltrace` utility. There is no MCP server in this version.
 
-Read [reader-contract.md](references/reader-contract.md) for the actual command and evidence contract. The receiver starts with the desktop app or `ltrace-dev serve`. Standard OTLP HTTP exports appear automatically under Incoming traces. Do not ask the developer to create a debugging session or register a project.
+Read [reader-contract.md](references/reader-contract.md) for the actual command and evidence contract. The receiver starts with the desktop app or `ltrace-dev serve`. Standard OTLP HTTP exports appear automatically in the recent trace list. Do not ask the developer to create a debugging session or register a project.
 
 For an isolated test run, execute from the application repository:
 
@@ -45,13 +45,13 @@ Use capture expectations and the note command to associate instrumentation chang
 
 ## Inspect before forming a diagnosis
 
-Start with a bounded session summary and capture-health information. Retrieve relevant traces, operation groups, and spans rather than dumping the entire capture into context. Use returned IDs and pagination. Check raw evidence behind a suspected cause before changing code on that basis.
+Start with a bounded run summary and capture-health information. For a relevant trace, run `ltrace-dev findings RUN_ID TRACE_ID` and inspect its cited spans. Findings flag repeated recorded SQL, slow dependencies, and explicit retries; they are hypotheses to check against source and workload, not proof of a bug. Read the returned detection limitations. Retrieve relevant traces, operation groups, and spans rather than dumping the entire capture into context. Use returned IDs and pagination. Check raw evidence behind a suspected cause before changing code on that basis.
 
 Match the inspection to the symptom:
 
 - Slow request: examine operation durations, overlapping work, and time not covered by recorded child spans.
 - Repeated I/O: inspect normalized operation groups, counts, parent context, and representative calls; repetition is not automatically a bug.
-- Failure: inspect error status, exception events, exception events and observed attempts; a missing error marker does not prove correct behavior.
+- Failure: inspect error status, exception events and observed attempts; a missing error marker does not prove correct behavior.
 - Disconnected trace: distinguish a missing referenced parent, an external span link, and a viewer grouping error. Sampling, late arrival, flush failure, and propagation are possibilities, not interchangeable diagnoses.
 
 Separate observations, hypotheses, and missing evidence. Parent duration minus the union of clipped child intervals is time outside recorded child spans, not measured CPU time. Cross-host clock differences and absent async dependencies can prevent reliable causal attribution.
