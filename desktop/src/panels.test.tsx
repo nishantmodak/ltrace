@@ -101,7 +101,6 @@ describe("TracePanel 'Load more' staleness", () => {
         runId={runId}
         trace={makeTrace(traceIdA, 250)}
         requestedSpan={null}
-        onClose={() => {}}
       />,
     );
     const loadMore = screen.getByRole("button", { name: /Load more spans/ });
@@ -122,7 +121,6 @@ describe("TracePanel 'Load more' staleness", () => {
           runId={runId}
           trace={makeTrace(traceIdA, 300)}
           requestedSpan={null}
-          onClose={() => {}}
         />,
       );
       await Promise.resolve();
@@ -160,7 +158,6 @@ describe("TracePanel 'Load more' staleness", () => {
         runId={runId}
         trace={makeTrace(traceIdA, 250)}
         requestedSpan={null}
-        onClose={() => {}}
       />,
     );
     const loadMore = screen.getByRole("button", { name: /Load more spans/ });
