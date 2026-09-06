@@ -283,3 +283,44 @@ fn trace_index_groups_requests_and_searches_without_raw_attributes() {
     .unwrap();
     assert_eq!(filtered["total"], 0);
 }
+
+#[test]
+fn recent_traces_span_projects_and_preserve_run_identity_and_precision() {
+    let (_, store, first_run, first_token) = setup();
+    let project = store
+        .create_session("Other".into(), "/other".into(), vec![])
+        .unwrap();
+    let (second_run, second_token) = store
+        .start_run(&project.id, "other".into(), "test".into(), "".into())
+        .unwrap();
+    let mut spans = otlp::decode(FIXTURE, "application/json", "").unwrap();
+    spans.truncate(1);
+    spans[0].parent_span_id.clear();
+    spans[0].start_ns = "1788000000000000001".into();
+    spans[0].end_ns = "1788000000000000101".into();
+    store.ingest(&first_token, &spans).unwrap();
+    spans[0].start_ns = "1788000000000000002".into();
+    spans[0].name = "Other checkout".into();
+    store.ingest(&second_token, &spans).unwrap();
+    let query = std::collections::HashMap::from([("limit".into(), "1".into())]);
+    let page = api::read(&store, "traces", &query).unwrap();
+    assert_eq!(page["total"], 2);
+    assert_eq!(page["traces"][0]["run_id"], second_run.id);
+    assert_eq!(page["traces"][0]["start_ns"], "1788000000000000002");
+    assert!(page["traces"][0].get("raw").is_none());
+    let next = api::read(
+        &store,
+        "traces",
+        &std::collections::HashMap::from([("offset".into(), "1".into())]),
+    )
+    .unwrap();
+    assert_eq!(next["traces"][0]["run_id"], first_run);
+    let searched = api::read(
+        &store,
+        "traces",
+        &std::collections::HashMap::from([("q".into(), "OTHER CHECKOUT".into())]),
+    )
+    .unwrap();
+    assert_eq!(searched["total"], 1);
+    assert_eq!(searched["traces"][0]["run_id"], second_run.id);
+}

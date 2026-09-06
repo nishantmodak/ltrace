@@ -6,7 +6,7 @@ The desktop and CLI discover `connection.json` in the application data directory
 
 ## Automatic collection
 
-Open the desktop app or start the receiver, then export standard OTLP traces to its local endpoint. No project or debugging session creation is required. Plain exports appear under **Incoming traces**, with no claimed test association. Streams rotate after an hour or when their storage budget is reached.
+Open the desktop app or start the receiver, then export standard OTLP traces to its local endpoint. No project or debugging session creation is required. Plain exports appear in the recent trace list, with no claimed test association. They retain an internal Incoming traces grouping. Streams rotate after an hour or when their storage budget is reached.
 
 `ltrace-dev capture -- <test command>` discovers the Git root (or current directory), creates/reuses a project group atomically, starts an isolated run, and returns its report. `--expectations expectations.json` attaches a contract to that run. Internal session IDs remain a storage/API grouping detail; developers do not need to manage them.
 
@@ -17,6 +17,7 @@ All management paths begin `/api/` and use JSON:
 | Method | Path | Body / response |
 | --- | --- | --- |
 | GET | health | Product, version, API version |
+| GET | traces | Recent traces across all projects/runs; `q`, `offset`, `limit` (1–200). Each entry includes `run_id`; identity is `(run_id, trace_id)`. Search matches operations, services, or trace IDs. |
 | GET | sessions | Latest 200 sessions |
 | POST | projects/ensure | `{project}`; create/reuse a project group |
 | POST | sessions | `{title, project, expectations: []}` |

@@ -377,6 +377,57 @@ impl Store {
             [run],
         )
     }
+    /// Page trace identities from compact metadata, then load metadata only for
+    /// those traces. Run IDs remain part of identity even for reused trace IDs.
+    pub fn recent_traces(
+        &self,
+        search: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<serde_json::Value>, usize)> {
+        let conn = self.connection()?;
+        let groups = "SELECT run_id,trace_id,MIN(printf('%020s',json_extract(summary,'$.start_ns'))) AS started FROM spans GROUP BY run_id,trace_id HAVING ?1='' OR instr(lower(trace_id),?1)>0 OR MAX(instr(lower(json_extract(summary,'$.name')),?1))>0 OR MAX(instr(lower(json_extract(summary,'$.service')),?1))>0";
+        let total: i64 =
+            conn.query_row(&format!("SELECT COUNT(*) FROM ({groups})"), [search], |r| {
+                r.get(0)
+            })?;
+        let mut statement = conn.prepare(&format!(
+            "{groups} ORDER BY started DESC,run_id,trace_id LIMIT ?2 OFFSET ?3"
+        ))?;
+        let keys: Vec<(String, String)> = statement
+            .query_map(
+                params![
+                    search,
+                    limit.clamp(1, 200) as i64,
+                    offset.min(i64::MAX as usize) as i64
+                ],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut metadata = conn.prepare("SELECT spans.run_id,spans.summary FROM json_each(?1) AS selected JOIN spans ON spans.run_id=json_extract(selected.value,'$[0]') AND spans.trace_id=json_extract(selected.value,'$[1]')")?;
+        let rows = metadata.query_map([serde_json::to_string(&keys)?], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?;
+        let mut groups = std::collections::BTreeMap::<(String, String), Vec<Span>>::new();
+        for row in rows {
+            let (run, body) = row?;
+            let span: Span = serde_json::from_str(&body)?;
+            groups
+                .entry((run, span.trace_id.clone()))
+                .or_default()
+                .push(span);
+        }
+        let mut result = Vec::new();
+        for (run, trace) in keys {
+            let spans = groups.remove(&(run.clone(), trace)).unwrap_or_default();
+            if let Some(trace) = crate::analysis::traces(&spans).into_iter().next() {
+                let mut value = serde_json::to_value(trace)?;
+                value["run_id"] = run.into();
+                result.push(value);
+            }
+        }
+        Ok((result, total as usize))
+    }
     pub fn span_page(
         &self,
         run: &str,

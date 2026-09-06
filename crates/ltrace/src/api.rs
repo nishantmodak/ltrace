@@ -99,6 +99,25 @@ async fn write_handler(
 pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Result<Value> {
     let parts: Vec<_> = path.split('/').collect();
     match parts.as_slice() {
+        ["traces"] => {
+            let offset = query
+                .get("offset")
+                .map(|s| s.parse::<usize>())
+                .transpose()?
+                .unwrap_or(0);
+            let limit = query
+                .get("limit")
+                .map(|s| s.parse::<usize>())
+                .transpose()?
+                .unwrap_or(100)
+                .clamp(1, 200);
+            let search = query.get("q").map(|s| s.to_lowercase()).unwrap_or_default();
+            let (page, total) = store.recent_traces(&search, offset, limit)?;
+            let next = offset.saturating_add(page.len());
+            Ok(
+                json!({"traces":page,"total":total,"next_offset":if next<total {Some(next)} else {None}}),
+            )
+        }
         ["sessions"] => Ok(json!({"sessions":store.sessions()?, "limit":200})),
         ["sessions", id] => Ok(
             json!({"session":store.session(id)?, "runs":store.runs(id)?, "notes":store.notes(id)?, "limit":200}),
