@@ -41,34 +41,35 @@ export default function App() {
   const [requestedSpan, setRequestedSpan] = useState<string | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [showRun, setShowRun] = useState(false);
-  const [evidenceError, setEvidenceError] = useState("");
+  const [evidenceRef, setEvidenceRef] = useState<string | null>(null);
+  const referenced = useLive<RecentTracePage>(
+    evidenceRef,
+    () => api.read(`traces?q=${evidenceRef}`),
+    0,
+  );
+  useEffect(() => {
+    if (!referenced.data || !evidenceRef) return;
+    const target = referenced.data.traces.find(
+      (t) => t.run_id === runId && t.trace_id === evidenceRef,
+    );
+    if (!target) return;
+    setSelection(target);
+  }, [referenced.data, evidenceRef, runId]);
   const error =
     connection.error ||
     traces.error ||
     report.error ||
     detail.error ||
-    evidenceError;
+    referenced.error;
   const failures =
     report.data?.verification.filter((v) => v.status === "failed").length ?? 0;
   const unknown =
     report.data?.verification.filter((v) => v.status === "unknown").length ?? 0;
-  async function inspectEvidence(reference: string) {
+  function inspectEvidence(reference: string) {
     const [trace, span] = reference.split("/");
-    try {
-      const page = await api.read<RecentTracePage>(
-        `traces?limit=200&q=${trace}`,
-      );
-      const target = page.traces.find(
-        (t) => t.run_id === runId && t.trace_id === trace,
-      );
-      if (!target) throw new Error("Referenced trace was not found.");
-      setSelection(target);
-      setRequestedSpan(span);
-      setShowRun(false);
-      setEvidenceError("");
-    } catch (error) {
-      setEvidenceError(String(error));
-    }
+    setEvidenceRef(trace);
+    setRequestedSpan(span);
+    setShowRun(false);
   }
   return (
     <div className="app">

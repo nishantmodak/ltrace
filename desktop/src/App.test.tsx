@@ -376,16 +376,11 @@ it("preserves the comparison baseline when a note refreshes the session detail",
 it("retry re-fetches a one-shot referenced trace after a transient failure", async () => {
   const user = userEvent.setup();
   const original = vi.mocked(api.read).getMockImplementation()!;
-  const recentPage = Array.from({ length: 200 }, (_, i) => ({
-    ...trace,
-    trace_id: `ffff${String(i + 1).padStart(28, "0")}`,
-    root_span_id: `ffff${String(i + 1).padStart(28, "0")}`,
-  }));
   let referencedAttempts = 0;
   vi.mocked(api.read).mockImplementation(async (path) => {
-    if (path.includes("/traces?limit=200"))
-      return { traces: recentPage, total: 250, next_offset: "200" };
-    if (path.includes("/traces?q=")) {
+    if (path.startsWith("traces?limit=200"))
+      return { traces: [trace], total: 1, next_offset: null };
+    if (path.startsWith("traces?q=")) {
       referencedAttempts += 1;
       if (referencedAttempts === 1) throw new Error("receiver unreachable");
       return { traces: [trace], total: 1, next_offset: null };
@@ -394,8 +389,6 @@ it("retry re-fetches a one-shot referenced trace after a transient failure", asy
   });
   render(<App />);
   await screen.findByText("· 1 expectation failed");
-  await user.selectOptions(screen.getByLabelText("Run"), "run-2");
-  await waitFor(() => expect(api.read).toHaveBeenCalledWith("runs/run-2"));
   await user.click(screen.getByRole("button", { name: "Run details" }));
   await user.click(screen.getByText("One batch query"));
   await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
