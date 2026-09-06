@@ -16,7 +16,7 @@ provider = None
 def setUpModule():
     global provider
     # Test-local opt-in. Running normal tests never creates a network exporter.
-    if os.environ.get("LTRACE_RUN_ID"):
+    if os.environ.get("LTRACE_RUN_ID") or os.environ.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"):
         provider = TracerProvider(resource=Resource.create({"service.name": "catalog-example"}))
         provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(timeout=5)))
         trace.set_tracer_provider(provider)

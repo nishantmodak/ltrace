@@ -1,15 +1,41 @@
 # Real SQLite / OpenTelemetry reproduction
 
-Requires Python 3.10+ and a running ltrace desktop app or receiver. From this directory:
+This example preserves output correctness while replacing twelve per-item SQLite lookups with one batch query. It uses the official Python OTel SDK and actual SQLite work, not generated trace fixtures.
+
+From the repository root, with Python 3.10+:
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.lock
-ltrace-dev capture --label "Baseline" --expectations expectations.json -- .venv/bin/python -m unittest test_catalog.CatalogTest.test_load_twelve_items -v
+python3 -m venv examples/catalog/.venv
+examples/catalog/.venv/bin/pip install -r examples/catalog/requirements.lock
+cargo build --locked -p ltrace-local --bin ltrace-dev
+examples/catalog/.venv/bin/python scripts/verify_workflow.py
 ```
 
-The initial implementation performs twelve SQLite lookups for twelve items. The functional output assertion passes, but the one-query runtime contract fails. The report and desktop should show thirteen spans: one root and twelve `db.lookup` children.
+The verification script creates a temporary reproduction and receiver, captures `fixtures/baseline_catalog.py`, applies the current `catalog.py`, reruns the same test and contract, checks raw evidence through the CLI, sends ordinary SDK exports with no run setup, and restarts the receiver to verify persistence. It does not modify the example's source files.
 
-The SDK/exporter is enabled only in a capture run. Normal `python -m unittest -v` runs without network export. SDK setup belongs to the test module, with an explicit bounded flush and shutdown. Attributes identify the operation and source location without recording SQL parameter values.
+Expected evidence:
 
-The batching fix must preserve input order, duplicate IDs, missing-item behavior, and empty-input behavior. Run the full functional suite after changing the query, then capture the same twelve-item reproduction with the same expectation file. A passing count is only one part of verification.
+| Reproduction | Output test | Query spans | Runtime contract |
+| --- | --- | --- | --- |
+| Baseline | Passed | 12 | Failed |
+| Batched implementation | Passed | 1 | Passed |
+
+Each trace also contains one `catalog.load_items` root span. The full functional suite verifies ordering, duplicate IDs, missing items, and empty input after the fix. This example exercises a twelve-item workload, not arbitrary database limits or statistically reliable latency improvements.
+
+## Watch in the desktop
+
+Open ltrace and use its displayed data directory:
+
+```sh
+examples/catalog/.venv/bin/python scripts/verify_workflow.py --home '/path/from/connection/details'
+```
+
+Both captures and a separate Incoming traces stream appear in the desktop. Select a request to inspect its waterfall and attributes. **Run details** contains the test result, expectation and notes; choose the baseline there to compare operation counts.
+
+For an individual test from this example directory:
+
+```sh
+ltrace-dev capture --label "Batch lookup" --expectations expectations.json -- .venv/bin/python -m unittest test_catalog.CatalogTest.test_load_twelve_items -v
+```
+
+The SDK/exporter is test-local and enabled only for a capture run or an explicitly configured trace endpoint. Normal tests create no exporter. The provider has a bounded flush and shutdown. Attributes identify the operation and source without recording SQL parameter values.
