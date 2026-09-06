@@ -4,84 +4,71 @@ import { useLive } from "./useLive";
 import {
   duration,
   timeOf,
-  type Session,
   type SessionDetail,
   type Summary,
-  type TracePage,
-  type Trace,
+  type RecentTracePage,
+  type RecentTrace,
 } from "./domain";
 import { ConnectionDialog, RunDialog, TracePanel } from "./panels";
 
 export default function App() {
   const connection = useLive("connection", api.status);
-  const projects = useLive("projects", () =>
-    api.read<{ sessions: Session[] }>("sessions"),
-  );
-  const [projectId, setProjectId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!projectId && projects.data?.sessions[0])
-      setProjectId(projects.data.sessions[0].id);
-  }, [projectId, projects.data]);
-  const project = projectId ?? projects.data?.sessions[0]?.id ?? null;
-  const detail = useLive<SessionDetail>(project, () =>
-    api.read(`sessions/${project}`),
-  );
-  const [selectedRun, setSelectedRun] = useState("latest");
-  const runId =
-    (selectedRun === "latest" ? detail.data?.runs[0]?.id : selectedRun) ?? null;
-  const report = useLive<Summary>(runId, () => api.read(`runs/${runId}`));
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query), 200);
     return () => clearTimeout(timer);
   }, [query]);
-  const traces = useLive<TracePage>(runId ? `${runId}:${search}` : null, () =>
-    api.read(`runs/${runId}/traces?limit=200&q=${encodeURIComponent(search)}`),
+  const traces = useLive<RecentTracePage>(`traces:${search}`, () =>
+    api.read(`traces?limit=200&q=${encodeURIComponent(search)}`),
   );
-  const [selectedTrace, setSelectedTrace] = useState<string | null>(null);
+  const [selection, setSelection] = useState<RecentTrace | null>(null);
+  const selected =
+    traces.data?.traces.find(
+      (t) =>
+        t.run_id === selection?.run_id && t.trace_id === selection?.trace_id,
+    ) ?? selection;
+  useEffect(() => {
+    if (!selection && traces.data?.traces[0])
+      setSelection(traces.data.traces[0]);
+  }, [selection, traces.data]);
+  const runId = selected?.run_id ?? null;
+  const report = useLive<Summary>(runId, () => api.read(`runs/${runId}`));
+  const project = report.data?.run.session_id ?? null;
+  const detail = useLive<SessionDetail>(project, () =>
+    api.read(`sessions/${project}`),
+  );
   const [requestedSpan, setRequestedSpan] = useState<string | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [showRun, setShowRun] = useState(false);
-  useEffect(() => {
-    setSelectedTrace(null);
-    setRequestedSpan(null);
-  }, [runId]);
-  const referenced = useLive<TracePage>(
-    selectedTrace &&
-      !traces.data?.traces.some((t) => t.trace_id === selectedTrace)
-      ? `${runId}:${selectedTrace}`
-      : null,
-    () => api.read(`runs/${runId}/traces?q=${selectedTrace}`),
-    0,
-  );
-  const selected: Trace | undefined =
-    traces.data?.traces.find((t) => t.trace_id === selectedTrace) ??
-    referenced.data?.traces[0] ??
-    (!selectedTrace ? traces.data?.traces[0] : undefined);
+  const [evidenceError, setEvidenceError] = useState("");
   const error =
     connection.error ||
-    projects.error ||
-    detail.error ||
-    report.error ||
     traces.error ||
-    referenced.error;
+    report.error ||
+    detail.error ||
+    evidenceError;
   const failures =
     report.data?.verification.filter((v) => v.status === "failed").length ?? 0;
   const unknown =
     report.data?.verification.filter((v) => v.status === "unknown").length ?? 0;
-  function switchProject(id: string) {
-    setProjectId(id);
-    setSelectedRun("latest");
-    setQuery("");
-    setSelectedTrace(null);
-  }
-  function inspectEvidence(reference: string) {
+  async function inspectEvidence(reference: string) {
     const [trace, span] = reference.split("/");
-    setQuery("");
-    setSelectedTrace(trace);
-    setRequestedSpan(span);
-    setShowRun(false);
+    try {
+      const page = await api.read<RecentTracePage>(
+        `traces?limit=200&q=${trace}`,
+      );
+      const target = page.traces.find(
+        (t) => t.run_id === runId && t.trace_id === trace,
+      );
+      if (!target) throw new Error("Referenced trace was not found.");
+      setSelection(target);
+      setRequestedSpan(span);
+      setShowRun(false);
+      setEvidenceError("");
+    } catch (error) {
+      setEvidenceError(String(error));
+    }
   }
   return (
     <div className="app">
@@ -117,7 +104,6 @@ export default function App() {
             <button
               onClick={() => {
                 connection.refresh();
-                projects.refresh();
                 detail.refresh();
                 report.refresh();
                 traces.refresh();
@@ -127,7 +113,7 @@ export default function App() {
             </button>
           </div>
         )}
-        {!runId && !projects.data?.sessions.length ? (
+        {!selected && !traces.data?.total && !search ? (
           <div className="empty-state">
             <h1>Waiting for traces</h1>
             <p>
@@ -208,37 +194,6 @@ export default function App() {
             )}
             <div className="trace-workspace">
               <section className="trace-list" aria-label="Trace list">
-                <div className="trace-filters">
-                  <label>
-                    Project
-                    <select
-                      aria-label="Project"
-                      value={project ?? ""}
-                      onChange={(e) => switchProject(e.target.value)}
-                    >
-                      {projects.data?.sessions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.title}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Run
-                    <select
-                      aria-label="Run"
-                      value={selectedRun}
-                      onChange={(e) => setSelectedRun(e.target.value)}
-                    >
-                      <option value="latest">Latest run</option>
-                      {detail.data?.runs.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
                 <div className="list-tools">
                   <input
                     aria-label="Search traces"
@@ -255,11 +210,14 @@ export default function App() {
                   <div className="trace-items">
                     {traces.data?.traces.map((t) => (
                       <button
-                        key={t.trace_id}
-                        className={`trace-item ${selected?.trace_id === t.trace_id ? "selected" : ""}`}
-                        aria-pressed={selected?.trace_id === t.trace_id}
+                        key={`${t.run_id}:${t.trace_id}`}
+                        className={`trace-item ${selected?.run_id === t.run_id && selected?.trace_id === t.trace_id ? "selected" : ""}`}
+                        aria-pressed={
+                          selected?.run_id === t.run_id &&
+                          selected?.trace_id === t.trace_id
+                        }
                         onClick={() => {
-                          setSelectedTrace(t.trace_id);
+                          setSelection(t);
                           setRequestedSpan(null);
                         }}
                       >

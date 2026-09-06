@@ -231,26 +231,6 @@ main {
   border-right: 1px solid var(--line);
   background: #fafaf9;
 }
-.trace-filters {
-  padding: 15px 16px 10px;
-  display: grid;
-  gap: 10px;
-  border-bottom: 1px solid var(--line);
-}
-.trace-filters label {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 11px;
-}
-.trace-filters select {
-  width: 100%;
-  max-width: none;
-  color: #333;
-  font-size: 11px;
-}
 .list-tools {
   display: flex;
   align-items: center;

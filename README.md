@@ -36,7 +36,7 @@ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318/v1/traces
 OTEL_EXPORTER_OTLP_TRACES_PROTOCOL=http/protobuf
 ```
 
-Ordinary exports appear under **Incoming traces**. They are not attributed to a test. The app shows operations, trace waterfalls, exact IDs/timestamps, attributes, events, links, and instrumentation resources. It accepts OTLP HTTP protobuf or JSON, with gzip support.
+All recent traces appear together, newest first, without project or run dropdowns. Search by operation, service, or trace ID. Ordinary exports are not attributed to a test. The app shows operations, trace waterfalls, exact IDs/timestamps, attributes, events, links, and instrumentation resources. It accepts OTLP HTTP protobuf or JSON, with gzip support.
 
 The application still needs instrumentation and an SDK flush before short-lived processes exit. For code without tracing, the companion skill guides your existing coding agent to add focused OTel instrumentation.
 
@@ -66,6 +66,15 @@ The report contains the project grouping ID as `run.session_id`. The `session` n
 An expectation specifies an exact service/operation, count range, and source-backed reason. See [the example contract](examples/catalog/expectations.json). Each run retains its own contract. The desktop separates **functional test result**, **capture health**, and **runtime verification**. A missing or partial capture cannot silently become a pass.
 
 Give your coding agent [the companion skill](skills/ltrace-debug/SKILL.md). It describes how to instrument, run, inspect, fix, and verify using the implemented commands. Skill loading depends on the coding agent's configuration; ltrace does not claim to force an agent to inspect evidence.
+
+## Inspect small and complex demo traces
+
+With the desktop open, run `python3 scripts/demo_traces.py`. This sends two explicitly **synthetic** examples through the local OTLP receiver:
+
+- **Demo · Health check** — 3 spans, 24 ms, one service.
+- **Demo · Checkout** — 30 spans, 1.2 s, four services, parallel inventory/cart/shipping work, twelve repeated lookups, and a payment timeout followed by a successful retry.
+
+Select either request in the left list. Expand/collapse branches, click a timeline bar for its attributes, and inspect the failed payment span's exception event. Both carry `demo.synthetic=true`; durations are designed fixtures, not performance measurements. These examples illustrate patterns; automatic N+1 detection is not implemented yet. Use `--port` for a non-default local receiver.
 
 ## Try a real reproduction
 

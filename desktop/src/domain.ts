@@ -270,3 +270,10 @@ export function attributeValue(value: unknown): string {
   }
   return JSON.stringify(value) ?? "—";
 }
+
+export type RecentTrace = Trace & { run_id: string };
+export type RecentTracePage = {
+  traces: RecentTrace[];
+  total: number;
+  next_offset: number | null;
+};

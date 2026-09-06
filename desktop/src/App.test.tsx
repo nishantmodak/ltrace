@@ -45,6 +45,7 @@ const span = {
   scope: {},
 };
 const trace = {
+  run_id: run.id,
   trace_id: span.trace_id,
   root_span_id: span.span_id,
   name: "db.lookup",
@@ -104,7 +105,7 @@ beforeEach(() => {
         run: { ...run, id: "run-2", label: "Earlier" },
         operations: [{ ...report.operations[0], count: 1 }],
       };
-    if (path.includes("/traces?"))
+    if (path.startsWith("traces?") || path.includes("/traces?"))
       return { traces: [trace], total: 1, next_offset: null };
     if (path.includes("/spans?"))
       return { spans: [span], total: 1, next_offset: null };
@@ -212,9 +213,7 @@ describe("trace-first desktop", () => {
       target: { value: "checkout" },
     });
     await waitFor(() =>
-      expect(api.read).toHaveBeenCalledWith(
-        "runs/run-1/traces?limit=200&q=checkout",
-      ),
+      expect(api.read).toHaveBeenCalledWith("traces?limit=200&q=checkout"),
     );
     expect(
       vi
@@ -224,7 +223,11 @@ describe("trace-first desktop", () => {
     ).toBe(true);
   });
   it("shows a quiet empty state when no telemetry exists", async () => {
-    vi.mocked(api.read).mockResolvedValue({ sessions: [] });
+    vi.mocked(api.read).mockResolvedValue({
+      traces: [],
+      total: 0,
+      next_offset: null,
+    });
     render(<App />);
     expect(
       await screen.findByRole("heading", { name: "Waiting for traces" }),
@@ -247,13 +250,30 @@ it("opens an expectation evidence reference and returns to the trace", async () 
     screen.queryByRole("heading", { name: "Run details" }),
   ).not.toBeInTheDocument();
 });
-it("switches historical runs without replacing them with the latest capture", async () => {
+it("shows traces from different runs without navigation dropdowns", async () => {
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  vi.mocked(api.read).mockImplementation(async (path) =>
+    path.startsWith("traces?")
+      ? {
+          traces: [
+            trace,
+            { ...trace, run_id: "run-2", name: "Earlier request" },
+          ],
+          total: 2,
+          next_offset: null,
+        }
+      : original(path),
+  );
   const user = userEvent.setup();
   render(<App />);
   await screen.findByText("· 1 expectation failed");
-  await user.selectOptions(screen.getByLabelText("Run"), "run-2");
+  expect(screen.queryByLabelText("Run")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Project")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /Earlier request/ }));
   await waitFor(() => expect(api.read).toHaveBeenCalledWith("runs/run-2"));
-  expect(screen.getByLabelText("Run")).toHaveValue("run-2");
+  expect(
+    screen.getByRole("button", { name: /Earlier request/ }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 it("renders unassigned incoming traffic without claiming tests passed", async () => {
   const original = vi.mocked(api.read).getMockImplementation()!;

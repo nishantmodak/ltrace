@@ -428,6 +428,10 @@ export function RunDialog({
       </div>
       <dl className="run-facts">
         <div>
+          <dt>Project</dt>
+          <dd>{detail.session.project}</dd>
+        </div>
+        <div>
           <dt>Test</dt>
           <dd>
             {summary.run.test_status === "not_run"
