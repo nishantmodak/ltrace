@@ -1,0 +1,12 @@
+.DS_Store
+target/
+node_modules/
+dist/
+coverage/
+*.sqlite*
+*.db
+.ltrace/
+playwright-report/
+test-results/
+__pycache__/
+.venv/
