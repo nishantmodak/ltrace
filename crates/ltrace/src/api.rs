@@ -156,6 +156,18 @@ pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Resul
                 json!({"traces":page,"total":total,"next_offset":if next<total {Some(next)} else {None}}),
             )
         }
+        ["runs", id, "traces", trace, "findings"] => {
+            let run = store.run(id)?;
+            let spans = store.finding_spans(id, trace)?;
+            ensure!(!spans.is_empty(), "not found");
+            let mut report = crate::findings::detect(&spans);
+            if !run.issues.is_empty()
+                || !matches!(run.capture_status.as_str(), "settled" | "collecting")
+            {
+                report.limitations.push("Capture quality needs attention. Missing findings do not establish that the request is healthy.".into());
+            }
+            Ok(serde_json::to_value(report)?)
+        }
         ["runs", id, "spans"] => {
             store.run(id)?;
             let offset = query

@@ -56,6 +56,8 @@ enum Action {
         #[arg(long, default_value_t = 100)]
         limit: usize,
     },
+    /// Detect repeated queries, slow dependencies, and explicit retries in a trace.
+    Findings { run: String, trace: String },
     /// Read raw evidence with pagination.
     Spans {
         run: String,
@@ -172,6 +174,16 @@ async fn run(args: Args) -> Result<i32> {
                 .append_pair("limit", &limit.to_string());
             client
                 .read(&format!("runs/{run}/traces?{}", url.query().unwrap_or("")))
+                .await?
+        }
+        Action::Findings { run, trace } => {
+            valid_id(&run)?;
+            ensure!(
+                trace.len() == 32 && trace.bytes().all(|b| b.is_ascii_hexdigit()),
+                "invalid trace ID"
+            );
+            client
+                .read(&format!("runs/{run}/traces/{trace}/findings"))
                 .await?
         }
         Action::Spans {

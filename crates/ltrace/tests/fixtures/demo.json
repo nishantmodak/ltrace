@@ -1,0 +1,1254 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "demo-api"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ltrace.synthetic-demo",
+            "version": "1"
+          },
+          "spans": [
+            {
+              "traceId": "67f1d3a7bb7f4097b07da2cd7937bd20",
+              "spanId": "0000000000000001",
+              "name": "Demo \u00b7 Health check",
+              "kind": 1,
+              "startTimeUnixNano": "1788667695562202000",
+              "endTimeUnixNano": "1788667695586202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Small \u00b7 health check"
+                  }
+                },
+                {
+                  "key": "http.route",
+                  "value": {
+                    "stringValue": "/health"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "67f1d3a7bb7f4097b07da2cd7937bd20",
+              "spanId": "0000000000000002",
+              "name": "cache.ping",
+              "kind": 1,
+              "startTimeUnixNano": "1788667695564202000",
+              "endTimeUnixNano": "1788667695569202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Small \u00b7 health check"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "67f1d3a7bb7f4097b07da2cd7937bd20",
+              "spanId": "0000000000000003",
+              "name": "db.ping",
+              "kind": 1,
+              "startTimeUnixNano": "1788667695571202000",
+              "endTimeUnixNano": "1788667695583202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Small \u00b7 health check"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000001",
+              "name": "Demo \u00b7 Checkout",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696562202000",
+              "endTimeUnixNano": "1788667697762202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "http.route",
+                  "value": {
+                    "stringValue": "/checkout"
+                  }
+                },
+                {
+                  "key": "demo.expected_query_count",
+                  "value": {
+                    "intValue": "12"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              }
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000002",
+              "name": "auth.validate",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696564202000",
+              "endTimeUnixNano": "1788667696597202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000003",
+              "name": "GET /cart",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696607202000",
+              "endTimeUnixNano": "1788667697002202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000013",
+              "name": "POST /inventory/check",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696607202000",
+              "endTimeUnixNano": "1788667696902202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000016",
+              "name": "shipping.quote",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696607202000",
+              "endTimeUnixNano": "1788667696762202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000017",
+              "name": "payment.authorize",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697012202000",
+              "endTimeUnixNano": "1788667697582202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000018",
+              "name": "POST /charge \u00b7 attempt 1",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697022202000",
+              "endTimeUnixNano": "1788667697192202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "retry.attempt",
+                  "value": {
+                    "intValue": "1"
+                  }
+                },
+                {
+                  "key": "http.response.status_code",
+                  "value": {
+                    "intValue": "504"
+                  }
+                }
+              ],
+              "status": {
+                "code": 2,
+                "message": "Simulated payment provider timeout"
+              },
+              "parentSpanId": "0000000000000017",
+              "events": [
+                {
+                  "name": "exception",
+                  "timeUnixNano": "1788667697192202000",
+                  "attributes": [
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "Synthetic timeout; next attempt succeeds"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000001a",
+              "name": "POST /charge \u00b7 attempt 2",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697292202000",
+              "endTimeUnixNano": "1788667697572202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "retry.attempt",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "http.response.status_code",
+                  "value": {
+                    "intValue": "200"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000017"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000001d",
+              "name": "db.insert_order",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697592202000",
+              "endTimeUnixNano": "1788667697652202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000001e",
+              "name": "notification.publish",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697662202000",
+              "endTimeUnixNano": "1788667697732202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000001"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "demo-cart"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ltrace.synthetic-demo",
+            "version": "1"
+          },
+          "spans": [
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000004",
+              "name": "cart.load",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696612202000",
+              "endTimeUnixNano": "1788667696987202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000003"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000005",
+              "name": "cache.get \u00b7 miss",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696617202000",
+              "endTimeUnixNano": "1788667696629202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "cache.hit",
+                  "value": {
+                    "boolValue": false
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000004"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000006",
+              "name": "cart.load_items",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696637202000",
+              "endTimeUnixNano": "1788667696962202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000004"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000007",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696642202000",
+              "endTimeUnixNano": "1788667696658202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "0"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000008",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696667202000",
+              "endTimeUnixNano": "1788667696683202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "1"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000009",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696692202000",
+              "endTimeUnixNano": "1788667696708202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "2"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000a",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696717202000",
+              "endTimeUnixNano": "1788667696733202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "3"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000b",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696742202000",
+              "endTimeUnixNano": "1788667696758202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "4"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000c",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696767202000",
+              "endTimeUnixNano": "1788667696783202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "5"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000d",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696792202000",
+              "endTimeUnixNano": "1788667696808202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "6"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000e",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696817202000",
+              "endTimeUnixNano": "1788667696833202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "7"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000000f",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696842202000",
+              "endTimeUnixNano": "1788667696858202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "8"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000010",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696867202000",
+              "endTimeUnixNano": "1788667696883202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "9"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000011",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696892202000",
+              "endTimeUnixNano": "1788667696908202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "10"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000012",
+              "name": "SELECT catalog item",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696917202000",
+              "endTimeUnixNano": "1788667696933202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                },
+                {
+                  "key": "db.query.text",
+                  "value": {
+                    "stringValue": "SELECT name, price FROM items WHERE id = ?"
+                  }
+                },
+                {
+                  "key": "demo.item_index",
+                  "value": {
+                    "intValue": "11"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000006"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "demo-inventory"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ltrace.synthetic-demo",
+            "version": "1"
+          },
+          "spans": [
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000014",
+              "name": "inventory.check",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696612202000",
+              "endTimeUnixNano": "1788667696892202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000013"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000015",
+              "name": "SELECT stock batch",
+              "kind": 1,
+              "startTimeUnixNano": "1788667696632202000",
+              "endTimeUnixNano": "1788667696802202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                },
+                {
+                  "key": "db.system.name",
+                  "value": {
+                    "stringValue": "postgresql"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "0000000000000014"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "demo-payments"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ltrace.synthetic-demo",
+            "version": "1"
+          },
+          "spans": [
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "0000000000000019",
+              "name": "charge \u00b7 timeout",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697027202000",
+              "endTimeUnixNano": "1788667697187202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 2,
+                "message": "Simulated payment provider timeout"
+              },
+              "parentSpanId": "0000000000000018",
+              "events": [
+                {
+                  "name": "exception",
+                  "timeUnixNano": "1788667697187202000",
+                  "attributes": [
+                    {
+                      "key": "exception.message",
+                      "value": {
+                        "stringValue": "Synthetic timeout; next attempt succeeds"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000001b",
+              "name": "charge \u00b7 approved",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697297202000",
+              "endTimeUnixNano": "1788667697562202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "000000000000001a"
+            },
+            {
+              "traceId": "e88891ffb5eb407a9eb82bfbb5e3932a",
+              "spanId": "000000000000001c",
+              "name": "db.insert_payment",
+              "kind": 1,
+              "startTimeUnixNano": "1788667697462202000",
+              "endTimeUnixNano": "1788667697532202000",
+              "attributes": [
+                {
+                  "key": "demo.synthetic",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "demo.scenario",
+                  "value": {
+                    "stringValue": "Complex \u00b7 checkout"
+                  }
+                }
+              ],
+              "status": {
+                "code": 1
+              },
+              "parentSpanId": "000000000000001b"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

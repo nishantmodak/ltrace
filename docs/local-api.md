@@ -27,6 +27,7 @@ All management paths begin `/api/` and use JSON:
 | POST | runs/:id/finish | `{exit_code: 0, issue: null}`; can finish once |
 | GET | runs/:id | Test/capture states, quality issues, first 100 operation groups, expectations |
 | GET | runs/:id/traces | Compact request index; `q`, `offset`, `limit` (1–200), no raw attributes |
+| GET | runs/:id/traces/:trace/findings | Automatic findings, evidence span IDs, analyzed span count, detection limitations. At most 50 findings and 200 references per finding. |
 | GET | runs/:id/spans | Raw spans, `total`, `next_offset`; `offset`, `limit` (1–200), optional `trace_id` |
 | GET | runs/:id/spans/:trace/:span | Raw span and uncovered recorded child time |
 

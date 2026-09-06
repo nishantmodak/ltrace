@@ -377,6 +377,14 @@ impl Store {
             [run],
         )
     }
+    pub fn finding_spans(&self, run: &str, trace: &str) -> Result<Vec<Span>> {
+        let conn = self.connection()?;
+        read_many(
+            &conn,
+            "SELECT json_set(summary,'$.raw',json_object('attributes',json_extract(body,'$.raw.attributes'))) FROM spans WHERE run_id=?1 AND trace_id=?2 ORDER BY span_id",
+            params![run, trace],
+        )
+    }
     /// Page trace identities from compact metadata, then load metadata only for
     /// those traces. Run IDs remain part of identity even for reused trace IDs.
     pub fn recent_traces(
