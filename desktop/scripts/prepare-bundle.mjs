@@ -1,0 +1,10 @@
+import {execFileSync} from 'node:child_process';
+import {mkdirSync,copyFileSync,chmodSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../../',import.meta.url));
+execFileSync('cargo',['build','--locked','--release','-p','ltrace-local','--bin','ltrace-dev'],{cwd:root,stdio:'inherit'});
+const extension=process.platform==='win32'?'.exe':'';
+mkdirSync(new URL('../bin/',import.meta.url),{recursive:true});
+const destination=new URL(`../bin/ltrace-dev${extension}`,import.meta.url);
+copyFileSync(new URL(`../../target/release/ltrace-dev${extension}`,import.meta.url),destination);
+chmodSync(destination,0o755);

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ltrace",
+  "version": "0.1.0",
+  "identifier": "dev.ltrace.desktop",
+  "build": {
+    "beforeDevCommand": "npm run prepare:cli && npm run dev",
+    "beforeBuildCommand": "npm run prepare:bundle",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ltrace",
+        "width": 1320,
+        "height": 860,
+        "minWidth": 1060,
+        "minHeight": 650,
+        "backgroundColor": "#ffffff"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app"
+    ],
+    "shortDescription": "Local runtime evidence for coding agents",
+    "category": "DeveloperTool",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../bin/": "bin/",
+      "../../skills/ltrace-debug/": "skills/ltrace-debug/"
+    }
+  }
+}

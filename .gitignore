@@ -10,3 +10,7 @@ playwright-report/
 test-results/
 __pycache__/
 .venv/
+*.tsbuildinfo
+desktop/bin/
+
+desktop/src-tauri/gen/
