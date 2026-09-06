@@ -1,0 +1,3 @@
+[
+  {"name":"One batch query for twelve items","reason":"This reproduction loads twelve known items. The requested improvement replaces per-item lookups with one batch query, preserving the ordered output.","service":"catalog-example","operation":"db.lookup","min_count":1,"max_count":1}
+]
