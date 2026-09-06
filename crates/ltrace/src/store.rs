@@ -265,7 +265,7 @@ impl Store {
             |r| r.get(0),
         )?;
         let mut bytes: i64 = tx.query_row(
-            "SELECT COALESCE(SUM(length(body)),0) FROM spans WHERE run_id=?1",
+            "SELECT COALESCE(SUM(octet_length(body)),0) FROM spans WHERE run_id=?1",
             [&run.id],
             |r| r.get(0),
         )?;
