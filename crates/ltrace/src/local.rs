@@ -41,6 +41,9 @@ impl Drop for LocalServer {
     fn drop(&mut self) {
         self.task.abort();
         let _ = std::fs::remove_file(&self.connection_path);
+        // Closing our handle alone can leave the lock held by a child between
+        // fork and exec. Release it explicitly before allowing a restart.
+        let _ = FileExt::unlock(&self._lock);
     }
 }
 
@@ -170,5 +173,29 @@ impl Client {
             "incompatible local receiver"
         );
         Ok(health)
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn restart_releases_lock_even_when_a_duplicate_handle_is_alive() {
+        let dir = tempfile::tempdir().unwrap();
+        let server = start(dir.path(), 0).await.unwrap();
+        // A concurrently spawned child can retain this same file description
+        // between fork and exec, even when the descriptor is close-on-exec.
+        let duplicate = server._lock.try_clone().unwrap();
+        assert!(start(dir.path(), 0).await.is_err());
+
+        drop(server);
+        let restarted = start(dir.path(), 0).await.unwrap();
+        Client::connect(dir.path()).unwrap().health().await.unwrap();
+        assert!(start(dir.path(), 0).await.is_err());
+
+        drop(duplicate);
+        assert!(start(dir.path(), 0).await.is_err());
+        drop(restarted);
     }
 }
