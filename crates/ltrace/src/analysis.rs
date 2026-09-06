@@ -31,6 +31,7 @@ pub struct Summary {
     pub trace_count: usize,
     pub issues: Vec<String>,
     pub operations: Vec<Operation>,
+    pub operations_total: usize,
     pub verification: Vec<Verification>,
 }
 
@@ -101,7 +102,8 @@ pub fn summarize(run: Run, spans: &[Span]) -> Summary {
     for s in spans {
         groups.entry((&s.service, &s.name)).or_default().push(s);
     }
-    let operations = groups
+    let operations_total = groups.len();
+    let mut operations: Vec<_> = groups
         .into_iter()
         .map(|((service, name), spans)| Operation {
             service: service.into(),
@@ -121,6 +123,13 @@ pub fn summarize(run: Run, spans: &[Span]) -> Summary {
                 .collect(),
         })
         .collect();
+    operations.sort_by(|a, b| {
+        b.count
+            .cmp(&a.count)
+            .then_with(|| a.service.cmp(&b.service))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    operations.truncate(100);
     Summary {
         run,
         span_count: spans.len(),
@@ -131,6 +140,7 @@ pub fn summarize(run: Run, spans: &[Span]) -> Summary {
             .len(),
         issues: issues.into_iter().collect(),
         operations,
+        operations_total,
         verification,
     }
 }

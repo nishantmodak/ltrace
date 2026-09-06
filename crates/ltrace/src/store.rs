@@ -6,6 +6,13 @@ use std::{path::Path, sync::Mutex, time::Duration};
 use uuid::Uuid;
 
 pub const MAX_SPANS: usize = 50_000;
+pub const MAX_RUN_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Debug)]
+pub struct Ingest {
+    pub inserted: usize,
+    pub rejected: usize,
+}
 pub struct Store {
     conn: Mutex<Connection>,
 }
@@ -163,7 +170,7 @@ impl Store {
     }
     /// Atomic batch; retries are idempotent. Conflicts preserve the original and
     /// permanently taint the run instead of silently rewriting history.
-    pub fn ingest(&self, token: &str, spans: &[Span]) -> Result<usize> {
+    pub fn ingest(&self, token: &str, spans: &[Span]) -> Result<Ingest> {
         for span in spans {
             span.validate()?;
         }
@@ -180,7 +187,13 @@ impl Store {
             [&run.id],
             |r| r.get(0),
         )?;
+        let mut bytes: i64 = tx.query_row(
+            "SELECT COALESCE(SUM(length(body)),0) FROM spans WHERE run_id=?1",
+            [&run.id],
+            |r| r.get(0),
+        )?;
         let mut added = 0;
+        let mut rejected = 0;
         for span in spans {
             let body = json(span)?;
             let previous: Option<String> = tx
@@ -199,10 +212,11 @@ impl Store {
                 }
                 continue;
             }
-            if n as usize + added >= MAX_SPANS {
+            if n as usize + added >= MAX_SPANS || bytes as usize + body.len() > MAX_RUN_BYTES {
+                rejected += 1;
                 add_issue(
                     &mut run,
-                    "Run span limit reached; additional spans rejected.",
+                    "Run storage limit reached; additional spans rejected.",
                 );
                 continue;
             }
@@ -210,6 +224,7 @@ impl Store {
                 "INSERT INTO spans VALUES(?1,?2,?3,?4)",
                 params![run.id, span.trace_id, span.span_id, body],
             )?;
+            bytes += body.len() as i64;
             added += 1;
         }
         if run.finished_ms.is_some() && added > 0 {
@@ -226,7 +241,48 @@ impl Store {
             params![run.id, json(&run)?],
         )?;
         tx.commit()?;
-        Ok(added)
+        Ok(Ingest {
+            inserted: added,
+            rejected,
+        })
+    }
+    pub fn interrupt_unfinished(&self) -> Result<()> {
+        let conn = self.connection()?;
+        let runs: Vec<Run> = read_many(&conn, "SELECT body FROM runs", [])?;
+        for mut run in runs.into_iter().filter(|r| r.finished_ms.is_none()) {
+            run.finished_ms = Some(now_ms());
+            run.test_status = "interrupted".into();
+            run.capture_status = "partial".into();
+            add_issue(&mut run, "Receiver restarted before the run finished.");
+            conn.execute(
+                "UPDATE runs SET body=?2 WHERE id=?1",
+                params![run.id, json(&run)?],
+            )?;
+        }
+        Ok(())
+    }
+    pub fn check_token(&self, token: &str) -> Result<()> {
+        let conn = self.connection()?;
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM runs WHERE token=?1)",
+            [token],
+            |r| r.get(0),
+        )?;
+        ensure!(exists, "unknown export token");
+        Ok(())
+    }
+    pub fn mark_issue(&self, token: &str, issue: &str) -> Result<()> {
+        let conn = self.connection()?;
+        let mut run: Run = read_one(&conn, "SELECT body FROM runs WHERE token=?1", token)?;
+        add_issue(&mut run, issue);
+        if run.finished_ms.is_some() {
+            run.capture_status = "partial".into();
+        }
+        conn.execute(
+            "UPDATE runs SET body=?2 WHERE id=?1",
+            params![run.id, json(&run)?],
+        )?;
+        Ok(())
     }
     pub fn spans(&self, run: &str) -> Result<Vec<Span>> {
         let conn = self.connection()?;

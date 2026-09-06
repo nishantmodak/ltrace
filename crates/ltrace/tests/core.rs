@@ -89,8 +89,18 @@ fn evidence_persists_exactly_and_retries_are_idempotent() {
         .start_run(&sid, "baseline".into(), "tests".into(), "abc dirty".into())
         .unwrap();
     let original = span(1, 1_788_000_000_000_000_001, 1_788_000_000_000_000_099);
-    assert_eq!(s.ingest(&t, std::slice::from_ref(&original)).unwrap(), 1);
-    assert_eq!(s.ingest(&t, std::slice::from_ref(&original)).unwrap(), 0);
+    assert_eq!(
+        s.ingest(&t, std::slice::from_ref(&original))
+            .unwrap()
+            .inserted,
+        1
+    );
+    assert_eq!(
+        s.ingest(&t, std::slice::from_ref(&original))
+            .unwrap()
+            .inserted,
+        0
+    );
     s.finish_run(&r.id, Some(0), None).unwrap();
     drop(s);
     let reopened = Store::open(path).unwrap();
