@@ -105,8 +105,38 @@ pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Resul
         ),
         ["runs", id] => Ok(serde_json::to_value(summarize(
             store.run(id)?,
-            &store.spans(id)?,
+            &store.analysis_spans(id)?,
         ))?),
+        ["runs", id, "traces"] => {
+            store.run(id)?;
+            let offset = query
+                .get("offset")
+                .map(|s| s.parse::<usize>())
+                .transpose()?
+                .unwrap_or(0);
+            let limit = query
+                .get("limit")
+                .map(|s| s.parse::<usize>())
+                .transpose()?
+                .unwrap_or(100)
+                .clamp(1, 200);
+            let search = query.get("q").map(|s| s.to_lowercase()).unwrap_or_default();
+            let mut traces = crate::analysis::traces(&store.analysis_spans(id)?);
+            traces.retain(|t| {
+                search.is_empty()
+                    || t.name.to_lowercase().contains(&search)
+                    || t.services
+                        .iter()
+                        .any(|s| s.to_lowercase().contains(&search))
+                    || t.trace_id.contains(&search)
+            });
+            let total = traces.len();
+            let page: Vec<_> = traces.into_iter().skip(offset).take(limit).collect();
+            let next = offset.saturating_add(page.len());
+            Ok(
+                json!({"traces":page,"total":total,"next_offset":if next<total {Some(next)} else {None}}),
+            )
+        }
         ["runs", id, "spans"] => {
             store.run(id)?;
             let offset = query
@@ -121,13 +151,7 @@ pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Resul
                 .unwrap_or(100)
                 .clamp(1, 200);
             let trace = query.get("trace_id");
-            let spans: Vec<_> = store
-                .spans(id)?
-                .into_iter()
-                .filter(|s| trace.is_none_or(|t| &s.trace_id == t))
-                .collect();
-            let total = spans.len();
-            let page: Vec<_> = spans.into_iter().skip(offset).take(limit).collect();
+            let (page, total) = store.span_page(id, trace.map(String::as_str), offset, limit)?;
             let next = offset.saturating_add(page.len());
             Ok(
                 json!({"spans": page, "total":total, "next_offset": if next < total {Some(next)} else {None}}),
@@ -135,11 +159,8 @@ pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Resul
         }
         ["runs", id, "spans", trace, span] => {
             store.run(id)?;
-            let spans = store.spans(id)?;
-            let s = spans
-                .iter()
-                .find(|s| &s.trace_id == trace && &s.span_id == span)
-                .ok_or_else(|| anyhow::anyhow!("not found"))?;
+            let spans = store.analysis_spans(id)?;
+            let s = store.span(id, trace, span)?;
             let uncovered = s.interval().map(|interval| {
                 crate::analysis::uncovered_ns(
                     interval,

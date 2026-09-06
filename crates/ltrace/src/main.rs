@@ -46,6 +46,16 @@ enum Action {
         kind: String,
         id: String,
     },
+    /// List requests without loading raw attributes, with optional operation/service search.
+    Traces {
+        run: String,
+        #[arg(long)]
+        search: Option<String>,
+        #[arg(long, default_value_t = 0)]
+        offset: usize,
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+    },
     /// Read raw evidence with pagination.
     Spans {
         run: String,
@@ -147,6 +157,22 @@ async fn run(args: Args) -> Result<i32> {
         Action::Show { kind, id } => {
             valid_id(&id)?;
             client.read(&format!("{kind}s/{id}")).await?
+        }
+        Action::Traces {
+            run,
+            search,
+            offset,
+            limit,
+        } => {
+            valid_id(&run)?;
+            let mut url = reqwest::Url::parse("http://127.0.0.1/")?;
+            url.query_pairs_mut()
+                .append_pair("q", search.as_deref().unwrap_or(""))
+                .append_pair("offset", &offset.to_string())
+                .append_pair("limit", &limit.to_string());
+            client
+                .read(&format!("runs/{run}/traces?{}", url.query().unwrap_or("")))
+                .await?
         }
         Action::Spans {
             run,

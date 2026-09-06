@@ -76,8 +76,11 @@ pub struct Span {
     pub end_ns: String,
     pub error: bool,
     pub dropped: bool,
+    #[serde(default)]
     pub raw: Value,
+    #[serde(default)]
     pub resource: Value,
+    #[serde(default)]
     pub scope: Value,
 }
 

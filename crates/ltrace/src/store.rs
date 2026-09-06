@@ -23,7 +23,7 @@ impl Store {
         conn.busy_timeout(Duration::from_secs(5))?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         ensure!(
-            version <= 1,
+            version <= 2,
             "database was created by a newer ltrace; upgrade this application"
         );
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
@@ -33,7 +33,14 @@ impl Store {
             CREATE TABLE IF NOT EXISTS notes(id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id), body TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS runs_session ON runs(session_id);
             CREATE INDEX IF NOT EXISTS notes_session ON notes(session_id);
-            PRAGMA user_version=1;")?;
+            ")?;
+        if version < 2 {
+            conn.execute_batch(
+                "BEGIN IMMEDIATE; ALTER TABLE spans ADD COLUMN summary TEXT;
+                UPDATE spans SET summary=json_remove(body,'$.raw','$.resource','$.scope');
+                PRAGMA user_version=2; COMMIT;",
+            )?;
+        }
         Ok(Self {
             conn: Mutex::new(conn),
         })
@@ -291,8 +298,14 @@ impl Store {
                 continue;
             }
             tx.execute(
-                "INSERT INTO spans VALUES(?1,?2,?3,?4)",
-                params![run.id, span.trace_id, span.span_id, body],
+                "INSERT INTO spans(run_id,trace_id,span_id,body,summary) VALUES(?1,?2,?3,?4,?5)",
+                params![
+                    run.id,
+                    span.trace_id,
+                    span.span_id,
+                    body,
+                    span_metadata(span)?
+                ],
             )?;
             bytes += body.len() as i64;
             added += 1;
@@ -355,6 +368,50 @@ impl Store {
             params![run.id, json(&run)?],
         )?;
         Ok(())
+    }
+    pub fn analysis_spans(&self, run: &str) -> Result<Vec<Span>> {
+        let conn = self.connection()?;
+        read_many(
+            &conn,
+            "SELECT summary FROM spans WHERE run_id=?1 ORDER BY trace_id,span_id",
+            [run],
+        )
+    }
+    pub fn span_page(
+        &self,
+        run: &str,
+        trace: Option<&str>,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<Span>, usize)> {
+        let conn = self.connection()?;
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM spans WHERE run_id=?1 AND (?2 IS NULL OR trace_id=?2)",
+            params![run, trace],
+            |r| r.get(0),
+        )?;
+        let rows = read_many(
+            &conn,
+            "SELECT body FROM spans WHERE run_id=?1 AND (?2 IS NULL OR trace_id=?2) ORDER BY trace_id,span_id LIMIT ?3 OFFSET ?4",
+            params![
+                run,
+                trace,
+                limit.clamp(1, 200) as i64,
+                offset.min(i64::MAX as usize) as i64
+            ],
+        )?;
+        Ok((rows, total as usize))
+    }
+    pub fn span(&self, run: &str, trace: &str, span: &str) -> Result<Span> {
+        let conn = self.connection()?;
+        let body: Option<String> = conn
+            .query_row(
+                "SELECT body FROM spans WHERE run_id=?1 AND trace_id=?2 AND span_id=?3",
+                params![run, trace, span],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(serde_json::from_str(&body.context("not found")?)?)
     }
     pub fn spans(&self, run: &str) -> Result<Vec<Span>> {
         let conn = self.connection()?;
@@ -424,4 +481,10 @@ fn read_many<T: DeserializeOwned, P: rusqlite::Params>(
         .query_map(params, |r| r.get::<_, String>(0))?
         .map(|s| Ok(serde_json::from_str(&s?)?))
         .collect()
+}
+
+fn span_metadata(span: &Span) -> Result<String> {
+    Ok(serde_json::to_string(
+        &serde_json::json!({"trace_id":span.trace_id,"span_id":span.span_id,"parent_span_id":span.parent_span_id,"name":span.name,"service":span.service,"start_ns":span.start_ns,"end_ns":span.end_ns,"error":span.error,"dropped":span.dropped}),
+    )?)
 }

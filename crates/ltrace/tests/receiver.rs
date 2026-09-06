@@ -258,3 +258,28 @@ async fn ordinary_otlp_exports_appear_without_creating_a_session() {
     assert_eq!(store.spans(&runs[0].id).unwrap().len(), 1);
     assert_eq!(store.spans(&explicit_run).unwrap().len(), 1);
 }
+
+#[test]
+fn trace_index_groups_requests_and_searches_without_raw_attributes() {
+    let (_, store, id, token) = setup();
+    let mut spans = otlp::decode(FIXTURE, "application/json", "").unwrap();
+    let mut child = spans[0].clone();
+    child.span_id = "5555555555555555".into();
+    child.parent_span_id = spans[0].span_id.clone();
+    child.name = "child".into();
+    spans.push(child);
+    store.ingest(&token, &spans).unwrap();
+    let index = api::read(&store, &format!("runs/{id}/traces"), &Default::default()).unwrap();
+    assert_eq!(index["total"], 1);
+    assert_eq!(index["traces"][0]["span_count"], 2);
+    assert_eq!(index["traces"][0]["duration_ns"], "98");
+    assert_eq!(index["traces"][0]["name"], "db.lookup");
+    assert!(index["traces"][0].get("raw").is_none());
+    let filtered = api::read(
+        &store,
+        &format!("runs/{id}/traces"),
+        &[("q".into(), "absent".into())].into(),
+    )
+    .unwrap();
+    assert_eq!(filtered["total"], 0);
+}

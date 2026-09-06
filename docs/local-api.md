@@ -25,6 +25,7 @@ All management paths begin `/api/` and use JSON:
 | POST | sessions/:id/notes | `{run_id: null, body}` |
 | POST | runs/:id/finish | `{exit_code: 0, issue: null}`; can finish once |
 | GET | runs/:id | Test/capture states, quality issues, first 100 operation groups, expectations |
+| GET | runs/:id/traces | Compact request index; `q`, `offset`, `limit` (1–200), no raw attributes |
 | GET | runs/:id/spans | Raw spans, `total`, `next_offset`; `offset`, `limit` (1–200), optional `trace_id` |
 | GET | runs/:id/spans/:trace/:span | Raw span and uncovered recorded child time |
 
@@ -38,7 +39,7 @@ Limits: 4 MiB compressed and expanded requests, 10,000 spans per request, 64 KiB
 
 SDK shutdown/flush is required before the test exits. The capture command adds a bounded grace period, not a completeness guarantee. `settled` means the capture window closed with spans and no recorded ingestion issue; sampling, missing instrumentation, or unseen services can still create gaps. The runner sets `always_on` sampling for the child process, but SDK code may override it.
 
-A receiver lock prevents two processes serving the same store. After a restart, unfinished runs become interrupted/partial. SQLite uses WAL and refuses a future schema version. History is local and currently retained until the data directory is removed while the receiver is stopped. There is no automatic retention policy yet.
+A receiver lock prevents two processes serving the same store. After a restart, unfinished runs become interrupted/partial. SQLite uses WAL and refuses a future schema version. Schema v2 adds a compact span index; v1 captures migrate without changing raw evidence. List/summary queries use that index, while raw span pages use SQL limits. History is local and currently retained until the data directory is removed while the receiver is stopped. There is no automatic retention policy yet.
 
 ## Command results
 

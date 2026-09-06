@@ -78,6 +78,36 @@ pub fn summarize(run: Run, spans: &[Span]) -> Summary {
             issues.insert("Referenced parents are missing; capture may be incomplete or cross a service boundary.".into());
         }
     }
+    // Every node has at most one parent: color parent chains once, in linear time.
+    let lookup: BTreeMap<_, _> = spans
+        .iter()
+        .enumerate()
+        .map(|(i, s)| ((&s.trace_id, &s.span_id), i))
+        .collect();
+    let mut colors = vec![0u8; spans.len()];
+    for start in 0..spans.len() {
+        if colors[start] != 0 {
+            continue;
+        }
+        let mut path = vec![];
+        let mut current = Some(start);
+        while let Some(index) = current {
+            if colors[index] == 1 {
+                issues.insert("Cyclic parent references; trace structure is invalid.".into());
+                break;
+            }
+            if colors[index] == 2 {
+                break;
+            }
+            colors[index] = 1;
+            path.push(index);
+            let span = &spans[index];
+            current = lookup.get(&(&span.trace_id, &span.parent_span_id)).copied();
+        }
+        for index in path {
+            colors[index] = 2;
+        }
+    }
     let complete = run.capture_status == "settled" && issues.is_empty();
     let verification = run.expectations.iter().map(|e| {
         let matched: Vec<_> = spans.iter().filter(|s| s.service == e.service && s.name == e.operation).collect();
@@ -143,4 +173,66 @@ pub fn summarize(run: Run, spans: &[Span]) -> Summary {
         operations_total,
         verification,
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct Trace {
+    pub trace_id: String,
+    pub root_span_id: String,
+    pub name: String,
+    pub services: Vec<String>,
+    pub start_ns: String,
+    pub duration_ns: Option<String>,
+    pub span_count: usize,
+    pub errors: usize,
+}
+pub fn traces(spans: &[Span]) -> Vec<Trace> {
+    let mut groups: BTreeMap<&str, Vec<&Span>> = BTreeMap::new();
+    for span in spans {
+        groups.entry(&span.trace_id).or_default().push(span);
+    }
+    let mut result: Vec<_> = groups
+        .into_iter()
+        .map(|(id, mut spans)| {
+            spans.sort_by_key(|s| s.start_ns.parse::<u64>().unwrap_or(0));
+            let root = spans
+                .iter()
+                .find(|s| s.parent_span_id.is_empty())
+                .copied()
+                .unwrap_or(spans[0]);
+            let start = spans
+                .iter()
+                .filter_map(|s| s.interval())
+                .map(|(s, _)| s)
+                .min();
+            let end = spans
+                .iter()
+                .filter_map(|s| s.interval())
+                .map(|(_, e)| e)
+                .max();
+            Trace {
+                trace_id: id.into(),
+                root_span_id: root.span_id.clone(),
+                name: root.name.clone(),
+                services: spans
+                    .iter()
+                    .map(|s| s.service.clone())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect(),
+                start_ns: start.unwrap_or(0).to_string(),
+                duration_ns: start.zip(end).map(|(s, e)| (e - s).to_string()),
+                span_count: spans.len(),
+                errors: spans.iter().filter(|s| s.error).count(),
+            }
+        })
+        .collect();
+    result.sort_by(|a, b| {
+        b.start_ns
+            .len()
+            .cmp(&a.start_ns.len())
+            .then_with(|| b.start_ns.cmp(&a.start_ns))
+            .then_with(|| a.trace_id.cmp(&b.trace_id))
+    });
+    result
 }

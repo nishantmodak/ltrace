@@ -272,3 +272,87 @@ fn automatic_project_grouping_is_concurrency_safe_and_expectations_are_per_run()
     assert_eq!(s.run(&first.id).unwrap().expectations.len(), 1);
     assert!(second.expectations.is_empty());
 }
+
+#[test]
+fn newer_database_schema_is_refused_without_modification() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("future.sqlite");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch("PRAGMA user_version=99").unwrap();
+    drop(conn);
+    assert!(Store::open(&path).is_err());
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    assert_eq!(
+        conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        99
+    );
+}
+
+#[test]
+fn storage_budget_rejects_excess_and_keeps_accepted_evidence() {
+    let s = store();
+    let sid = session(&s);
+    let (r, t) = s
+        .start_run(&sid, "budget".into(), "test".into(), "".into())
+        .unwrap();
+    let spans: Vec<_> = (1..=1100)
+        .map(|i| {
+            let mut s = span(i, 1, 2);
+            s.raw = json!({"payload":"x".repeat(64_000)});
+            s
+        })
+        .collect();
+    let result = s.ingest(&t, &spans).unwrap();
+    assert!(result.rejected > 0);
+    assert_eq!(result.inserted + result.rejected, spans.len());
+    let retry = s.ingest(&t, &spans[..1]).unwrap();
+    assert_eq!(retry.inserted, 0);
+    assert_eq!(retry.rejected, 0);
+    let finished = s.finish_run(&r.id, Some(0), None).unwrap();
+    assert_eq!(finished.capture_status, "partial");
+    assert_eq!(s.spans(&r.id).unwrap().len(), result.inserted);
+}
+
+#[test]
+fn cyclic_parent_graph_is_unknown_even_when_operation_count_matches() {
+    let s = store();
+    let sid = session(&s);
+    let (r, t) = s
+        .start_run(&sid, "cycle".into(), "test".into(), "".into())
+        .unwrap();
+    let mut evidence = span(1, 1, 2);
+    evidence.parent_span_id = evidence.span_id.clone();
+    s.ingest(&t, &[evidence]).unwrap();
+    s.finish_run(&r.id, Some(0), None).unwrap();
+    let report = summarize(s.run(&r.id).unwrap(), &s.spans(&r.id).unwrap());
+    assert_eq!(report.verification[0].status, "unknown");
+    assert!(report.issues.iter().any(|s| s.contains("Cyclic")));
+}
+
+#[test]
+fn v1_evidence_is_migrated_to_a_compact_index_without_losing_raw_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("upgrade.sqlite");
+    let s = Store::open(&path).unwrap();
+    let sid = session(&s);
+    let (r, t) = s
+        .start_run(&sid, "upgrade".into(), "test".into(), "".into())
+        .unwrap();
+    let original = span(1, 1, 10);
+    s.ingest(&t, std::slice::from_ref(&original)).unwrap();
+    drop(s);
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch("ALTER TABLE spans DROP COLUMN summary; PRAGMA user_version=1;")
+        .unwrap();
+    drop(conn);
+    let s = Store::open(&path).unwrap();
+    let index = s.analysis_spans(&r.id).unwrap();
+    assert!(index[0].raw.is_null());
+    assert_eq!(index[0].name, original.name);
+    assert_eq!(
+        s.span(&r.id, &original.trace_id, &original.span_id)
+            .unwrap(),
+        original
+    );
+}
