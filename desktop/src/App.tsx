@@ -41,20 +41,32 @@ export default function App() {
   const [requestedSpan, setRequestedSpan] = useState<string | null>(null);
   const [showConnection, setShowConnection] = useState(false);
   const [showRun, setShowRun] = useState(false);
-  const [evidenceRef, setEvidenceRef] = useState<string | null>(null);
-  const referenced = useLive<RecentTracePage>(
-    evidenceRef,
-    () => api.read(`traces?q=${evidenceRef}`),
+  const [evidenceRequest, setEvidenceRequest] = useState<{
+    runId: string;
+    traceId: string;
+    spanId: string;
+  } | null>(null);
+  const referenced = useLive<RecentTrace>(
+    evidenceRequest ? JSON.stringify(evidenceRequest) : null,
+    async () => {
+      const request = evidenceRequest!;
+      const page = await api.read<RecentTracePage>(
+        `traces?limit=200&q=${request.traceId}`,
+      );
+      const target = page.traces.find(
+        (t) => t.run_id === request.runId && t.trace_id === request.traceId,
+      );
+      if (!target) throw new Error("Referenced trace was not found.");
+      return target;
+    },
     0,
   );
   useEffect(() => {
-    if (!referenced.data || !evidenceRef) return;
-    const target = referenced.data.traces.find(
-      (t) => t.run_id === runId && t.trace_id === evidenceRef,
-    );
-    if (!target) return;
-    setSelection(target);
-  }, [referenced.data, evidenceRef, runId]);
+    if (!referenced.data || !evidenceRequest) return;
+    setSelection(referenced.data);
+    setRequestedSpan(evidenceRequest.spanId);
+    setEvidenceRequest(null);
+  }, [referenced.data, evidenceRequest]);
   const error =
     connection.error ||
     traces.error ||
@@ -67,8 +79,9 @@ export default function App() {
     report.data?.verification.filter((v) => v.status === "unknown").length ?? 0;
   function inspectEvidence(reference: string) {
     const [trace, span] = reference.split("/");
-    setEvidenceRef(trace);
-    setRequestedSpan(span);
+    if (!runId) return;
+    setEvidenceRequest({ runId, traceId: trace, spanId: span });
+    referenced.refresh();
     setShowRun(false);
   }
   return (
@@ -221,6 +234,7 @@ export default function App() {
                         onClick={() => {
                           setSelection(t);
                           setRequestedSpan(null);
+                          setEvidenceRequest(null);
                         }}
                       >
                         <span className="trace-item-title">
