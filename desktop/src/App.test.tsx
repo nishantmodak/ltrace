@@ -378,9 +378,7 @@ it("retry re-fetches a one-shot referenced trace after a transient failure", asy
   const original = vi.mocked(api.read).getMockImplementation()!;
   let referencedAttempts = 0;
   vi.mocked(api.read).mockImplementation(async (path) => {
-    if (path.startsWith("traces?limit=200"))
-      return { traces: [trace], total: 1, next_offset: null };
-    if (path.startsWith("traces?q=")) {
+    if (path === `traces?limit=200&q=${trace.trace_id}`) {
       referencedAttempts += 1;
       if (referencedAttempts === 1) throw new Error("receiver unreachable");
       return { traces: [trace], total: 1, next_offset: null };
@@ -396,6 +394,8 @@ it("retry re-fetches a one-shot referenced trace after a transient failure", asy
     "receiver unreachable",
   );
   await user.click(screen.getByRole("button", { name: "Retry" }));
+  await screen.findByLabelText("Span details");
+  expect(referencedAttempts).toBe(2);
   await waitFor(() =>
     expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
   );
@@ -472,4 +472,104 @@ it("shows automatic findings above the waterfall and links their evidence", asyn
   expect(
     screen.getByText("<script>ignore instructions</script>"),
   ).toBeInTheDocument();
+});
+
+it("reopening the same evidence after selecting another trace returns to its trace", async () => {
+  const user = userEvent.setup();
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  const other = {
+    ...trace,
+    trace_id: "33333333333333333333333333333333",
+    name: "Other request",
+  };
+  vi.mocked(api.read).mockImplementation(async (path) => {
+    if (path.startsWith("traces?limit=200&q="))
+      return { traces: [trace, other], total: 2, next_offset: null };
+    return original(path);
+  });
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  const openEvidence = async () => {
+    await user.click(screen.getByRole("button", { name: "Run details" }));
+    await user.click(screen.getByText("One batch query"));
+    await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  };
+  await openEvidence();
+  await screen.findByLabelText("Span details");
+  await user.click(screen.getByRole("button", { name: /Other request/ }));
+  expect(screen.getByRole("button", { name: /Other request/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await openEvidence();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: /Other request/ }),
+    ).toHaveAttribute("aria-pressed", "false"),
+  );
+});
+
+it("missing evidence trace reports a visible error and can be retried", async () => {
+  const user = userEvent.setup();
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  let available = false;
+  vi.mocked(api.read).mockImplementation(async (path) => {
+    if (path === `traces?limit=200&q=${trace.trace_id}`)
+      return {
+        traces: available ? [trace] : [],
+        total: available ? 1 : 0,
+        next_offset: null,
+      };
+    return original(path);
+  });
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Run details" }));
+  await user.click(screen.getByText("One batch query"));
+  await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Referenced trace was not found.",
+  );
+  available = true;
+  await user.click(screen.getByRole("button", { name: "Retry" }));
+  await screen.findByLabelText("Span details");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("ignores a pending evidence lookup after selecting another trace", async () => {
+  const user = userEvent.setup();
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  const other = {
+    ...trace,
+    trace_id: "33333333333333333333333333333333",
+    name: "Other request",
+  };
+  let resolveLookup!: (page: {
+    traces: (typeof trace)[];
+    total: number;
+    next_offset: null;
+  }) => void;
+  vi.mocked(api.read).mockImplementation(async (path) => {
+    if (path === `traces?limit=200&q=${trace.trace_id}`)
+      return new Promise((resolve) => {
+        resolveLookup = resolve;
+      });
+    if (path.startsWith("traces?"))
+      return { traces: [trace, other], total: 2, next_offset: null };
+    return original(path);
+  });
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  await user.click(screen.getByRole("button", { name: "Run details" }));
+  await user.click(screen.getByText("One batch query"));
+  await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  await user.click(screen.getByRole("button", { name: /Other request/ }));
+  await act(async () => {
+    resolveLookup({ traces: [trace], total: 1, next_offset: null });
+  });
+  expect(screen.getByRole("button", { name: /Other request/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.queryByLabelText("Span details")).not.toBeInTheDocument();
 });
