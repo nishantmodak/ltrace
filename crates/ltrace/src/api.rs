@@ -140,15 +140,23 @@ pub fn read(store: &Store, path: &str, query: &HashMap<String, String>) -> Resul
                 .unwrap_or(100)
                 .clamp(1, 200);
             let search = query.get("q").map(|s| s.to_lowercase()).unwrap_or_default();
-            let mut traces = crate::analysis::traces(&store.analysis_spans(id)?);
-            traces.retain(|t| {
-                search.is_empty()
-                    || t.name.to_lowercase().contains(&search)
-                    || t.services
-                        .iter()
-                        .any(|s| s.to_lowercase().contains(&search))
-                    || t.trace_id.contains(&search)
-            });
+            let spans = store.analysis_spans(id)?;
+            let matching: std::collections::BTreeSet<&str> = spans
+                .iter()
+                .filter_map(|s| {
+                    if search.is_empty()
+                        || s.name.to_lowercase().contains(&search)
+                        || s.service.to_lowercase().contains(&search)
+                        || s.trace_id.contains(&search)
+                    {
+                        Some(s.trace_id.as_str())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            let mut traces = crate::analysis::traces(&spans);
+            traces.retain(|t| matching.contains(t.trace_id.as_str()));
             let total = traces.len();
             let page: Vec<_> = traces.into_iter().skip(offset).take(limit).collect();
             let next = offset.saturating_add(page.len());
