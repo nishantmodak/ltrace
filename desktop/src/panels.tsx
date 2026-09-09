@@ -112,10 +112,12 @@ export function TracePanel({
   runId,
   trace,
   requestedSpan,
+  evidenceNonce,
 }: {
   runId: string;
   trace: Trace;
   requestedSpan: string | null;
+  evidenceNonce: number;
 }) {
   const [spanId, setSpanId] = useState<string | null>(requestedSpan);
   const [findingId, setFindingId] = useState<string | null>(null);
@@ -143,7 +145,7 @@ export function TracePanel({
     setExtra([]);
     setNext(null);
     setError("");
-  }, [runId, trace.trace_id, trace.root_span_id, requestedSpan]);
+  }, [runId, trace.trace_id, trace.root_span_id, requestedSpan, evidenceNonce]);
   const page = useLive<SpanPage>(
     `${runId}:${trace.trace_id}:${trace.span_count}`,
     () => api.read(`runs/${runId}/spans?trace_id=${trace.trace_id}&limit=200`),

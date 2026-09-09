@@ -101,6 +101,7 @@ describe("TracePanel 'Load more' staleness", () => {
         runId={runId}
         trace={makeTrace(traceIdA, 250)}
         requestedSpan={null}
+        evidenceNonce={0}
       />,
     );
     const loadMore = screen.getByRole("button", { name: /Load more spans/ });
@@ -121,6 +122,7 @@ describe("TracePanel 'Load more' staleness", () => {
           runId={runId}
           trace={makeTrace(traceIdA, 300)}
           requestedSpan={null}
+          evidenceNonce={0}
         />,
       );
       await Promise.resolve();
@@ -158,6 +160,7 @@ describe("TracePanel 'Load more' staleness", () => {
         runId={runId}
         trace={makeTrace(traceIdA, 250)}
         requestedSpan={null}
+        evidenceNonce={0}
       />,
     );
     const loadMore = screen.getByRole("button", { name: /Load more spans/ });
@@ -174,5 +177,75 @@ describe("TracePanel 'Load more' staleness", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("span-200")).toBeInTheDocument();
     expect(screen.getByText("span-249")).toBeInTheDocument();
+  });
+});
+
+// Guards the evidence re-focus fix's design: a same-evidence re-click must
+// re-run the focus effect (re-apply requestedSpan) WITHOUT remounting the
+// panel, so user-built local state — collapsed branches, the finding
+// selection — survives. A key-based remount fix would reset collapsed to
+// its initial empty Set; this test pins the nonce-in-deps approach.
+describe("TracePanel evidence re-focus", () => {
+  it("re-applies requestedSpan on an evidenceNonce bump and preserves collapsed branches (no remount)", async () => {
+    vi.mocked(api.read).mockImplementation(async (path: string) => {
+      if (path.endsWith("/findings"))
+        return { findings: [], limitations: [], analyzed_spans: 1 };
+      if (path.includes("/spans/")) return inspected;
+      if (path.includes("/spans?")) return firstPage(traceIdA);
+      throw new Error(path);
+    });
+
+    const view = await mount(
+      <TracePanel
+        runId={runId}
+        trace={makeTrace(traceIdA, 250)}
+        requestedSpan="s000000"
+        evidenceNonce={0}
+      />,
+    );
+    // Trace is a linear chain s000000 -> s000001 -> ...; collapse s000001 so
+    // its descendants (s000002..) hide, leaving s000000 and s000001 visible.
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Collapse span-1" }));
+    });
+    expect(screen.queryByText("span-2")).not.toBeInTheDocument();
+
+    // Browse to a different span within the panel (mutates internal spanId
+    // only; requestedSpan prop stays s000000).
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Inspect span-1, 100 ns" }),
+      );
+    });
+    expect(document.querySelector(".span-row.selected")).toHaveAttribute(
+      "data-span-id",
+      "s000001",
+    );
+
+    // Same-evidence re-jump: bump evidenceNonce, keep requestedSpan and the
+    // trace identical (this is what App does on a re-click of the same ↗).
+    await act(async () => {
+      view.rerender(
+        <TracePanel
+          runId={runId}
+          trace={makeTrace(traceIdA, 250)}
+          requestedSpan="s000000"
+          evidenceNonce={1}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    // Focus effect re-ran via the nonce: spanId returns to requestedSpan.
+    expect(document.querySelector(".span-row.selected")).toHaveAttribute(
+      "data-span-id",
+      "s000000",
+    );
+    // Panel was NOT remounted: collapsed branch survives (a key-based remount
+    // would have reset collapsed to an empty Set and re-shown span-2).
+    expect(screen.queryByText("span-2")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Expand span-1" }),
+    ).toBeInTheDocument();
   });
 });

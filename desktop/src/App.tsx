@@ -46,6 +46,13 @@ export default function App() {
     traceId: string;
     spanId: string;
   } | null>(null);
+  // Bumped on every completed evidence jump so TracePanel can re-focus the
+  // requested span even when requestedSpan is unchanged on a re-click of the
+  // same evidence (React's state-update bailout would otherwise skip the
+  // re-sync and leave Span details closed). Not part of the panel key: we want
+  // to re-focus without remounting, preserving collapsed branches, loaded
+  // "Load more" spans, and the finding selection the user built up.
+  const [evidenceNonce, setEvidenceNonce] = useState(0);
   const referenced = useLive<RecentTrace>(
     evidenceRequest ? JSON.stringify(evidenceRequest) : null,
     async () => {
@@ -65,6 +72,7 @@ export default function App() {
     if (!referenced.data || !evidenceRequest) return;
     setSelection(referenced.data);
     setRequestedSpan(evidenceRequest.spanId);
+    setEvidenceNonce((n) => n + 1);
     setEvidenceRequest(null);
   }, [referenced.data, evidenceRequest]);
   const error =
@@ -283,6 +291,7 @@ export default function App() {
                   runId={runId}
                   trace={selected}
                   requestedSpan={requestedSpan}
+                  evidenceNonce={evidenceNonce}
                 />
               ) : (
                 <div className="waterfall-empty">
