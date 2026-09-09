@@ -2,7 +2,7 @@ use crate::{
     api::{AppState, router},
     store::Store,
 };
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -172,15 +172,23 @@ impl Client {
             .await
             .context("local receiver unavailable; open ltrace and retry")?;
         let status = response.status();
-        let body: Value = response.json().await?;
-        ensure!(
-            status.is_success(),
-            "{}",
-            body.get("error")
-                .and_then(Value::as_str)
-                .unwrap_or("local API request failed")
-        );
-        Ok(body)
+        // Read the body as text first so non-JSON error bodies (notably the
+        // plain-text 401/403 from the `authorize` middleware) can be surfaced
+        // verbatim instead of failing to decode and masking the real reason.
+        let text = response
+            .text()
+            .await
+            .context("local receiver unavailable; open ltrace and retry")?;
+        if !status.is_success() {
+            let message = serde_json::from_str::<Value>(&text)
+                .ok()
+                .as_ref()
+                .and_then(|b| b.get("error").and_then(Value::as_str))
+                .unwrap_or(&text)
+                .to_owned();
+            bail!("{message}");
+        }
+        Ok(serde_json::from_str(&text)?)
     }
     pub async fn health(&self) -> Result<Value> {
         let health = self.read("health").await?;
