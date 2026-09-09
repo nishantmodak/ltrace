@@ -509,6 +509,68 @@ it("reopening the same evidence after selecting another trace returns to its tra
   );
 });
 
+it("reopening the same evidence after closing span details reopens the panel", async () => {
+  const user = userEvent.setup();
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  const openEvidence = async () => {
+    await user.click(screen.getByRole("button", { name: "Run details" }));
+    await user.click(screen.getByText("One batch query"));
+    await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  };
+  await openEvidence();
+  expect(await screen.findByLabelText("Span details")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("Close span details"));
+  expect(screen.queryByLabelText("Span details")).not.toBeInTheDocument();
+  // Re-clicking the SAME evidence (no other span/trace selected in between)
+  // must re-focus the cited span and reopen Span details. Before the fix this
+  // was a silent no-op: setRequestedSpan hit React's Object.is bailout,
+  // TracePanel's dependency array was unchanged, and the panel key was
+  // identical so the panel was reused with spanId still null.
+  await openEvidence();
+  expect(await screen.findByLabelText("Span details")).toBeInTheDocument();
+});
+
+it("re-clicking the same evidence after browsing to another span re-focuses it", async () => {
+  const user = userEvent.setup();
+  const original = vi.mocked(api.read).getMockImplementation()!;
+  const child = {
+    ...span,
+    span_id: "3333333333333333",
+    parent_span_id: span.span_id,
+    name: "db.child",
+    start_ns: "1788000000000000011",
+    end_ns: "1788000000000000021",
+  };
+  vi.mocked(api.read).mockImplementation(async (path) =>
+    path.includes("/spans?")
+      ? { spans: [span, child], total: 2, next_offset: null }
+      : original(path),
+  );
+  const selectedSpanId = () =>
+    document
+      .querySelector(".span-row.selected")
+      ?.getAttribute("data-span-id") ?? null;
+  render(<App />);
+  await screen.findByText("· 1 expectation failed");
+  const openEvidence = async () => {
+    await user.click(screen.getByRole("button", { name: "Run details" }));
+    await user.click(screen.getByText("One batch query"));
+    await user.click(screen.getByRole("button", { name: "22222222 ↗" }));
+  };
+  await openEvidence();
+  await screen.findByLabelText("Span details");
+  expect(selectedSpanId()).toBe(span.span_id);
+  // Browse to a different span in the waterfall. This only changes
+  // TracePanel's internal spanId, not the App-level requestedSpan, so the
+  // subsequent same-evidence re-click must still re-focus via the nonce.
+  await user.click(screen.getByRole("button", { name: /Inspect db\.child/ }));
+  expect(selectedSpanId()).toBe(child.span_id);
+  await openEvidence();
+  await waitFor(() => expect(selectedSpanId()).toBe(span.span_id));
+  expect(await screen.findByLabelText("Span details")).toBeInTheDocument();
+});
+
 it("missing evidence trace reports a visible error and can be retried", async () => {
   const user = userEvent.setup();
   const original = vi.mocked(api.read).getMockImplementation()!;
