@@ -142,10 +142,12 @@ export function TracePanel({
   const [liveTotal, setLiveTotal] = useState<number | null>(null);
   useEffect(() => {
     setSpanId(requestedSpan);
+  }, [runId, trace.trace_id, trace.root_span_id, requestedSpan, evidenceNonce]);
+  useEffect(() => {
     setExtra([]);
     setNext(null);
     setError("");
-  }, [runId, trace.trace_id, trace.root_span_id, requestedSpan, evidenceNonce]);
+  }, [runId, trace.trace_id, trace.root_span_id]);
   const page = useLive<SpanPage>(
     `${runId}:${trace.trace_id}:${trace.span_count}`,
     () => api.read(`runs/${runId}/spans?trace_id=${trace.trace_id}&limit=200`),

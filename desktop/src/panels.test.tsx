@@ -249,3 +249,53 @@ describe("TracePanel evidence re-focus", () => {
     ).toBeInTheDocument();
   });
 });
+
+it.each([false, true])(
+  "preserves pagination on repeated evidence clicks (extra page loaded: %s)",
+  async (loadExtra) => {
+    vi.mocked(api.read).mockImplementation(async (path: string) => {
+      if (path.endsWith("/findings"))
+        return { findings: [], limitations: [], analyzed_spans: 250 };
+      if (path.includes("/spans/")) return inspected;
+      if (path.includes("offset=")) return staleTailPage(traceIdA);
+      if (path.includes("/spans?")) return firstPage(traceIdA);
+      throw new Error(path);
+    });
+    const view = await mount(
+      <TracePanel
+        runId={runId}
+        trace={makeTrace()}
+        requestedSpan="s000000"
+        evidenceNonce={0}
+      />,
+    );
+    if (loadExtra) {
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: /Load more spans/ }),
+        );
+      });
+      expect(screen.getByText("span-249")).toBeInTheDocument();
+    }
+    await act(async () => {
+      view.rerender(
+        <TracePanel
+          runId={runId}
+          trace={makeTrace()}
+          requestedSpan="s000000"
+          evidenceNonce={1}
+        />,
+      );
+    });
+    if (loadExtra) {
+      expect(screen.getByText("span-249")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Load more spans/ }),
+      ).not.toBeInTheDocument();
+    } else {
+      expect(
+        screen.getByRole("button", { name: /Load more spans/ }),
+      ).toHaveTextContent("200 of 250");
+    }
+  },
+);
