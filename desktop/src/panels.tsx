@@ -137,6 +137,7 @@ export function TracePanel({
   const [next, setNext] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [liveTotal, setLiveTotal] = useState<number | null>(null);
   useEffect(() => {
     setSpanId(requestedSpan);
     setExtra([]);
@@ -151,6 +152,7 @@ export function TracePanel({
   useEffect(() => {
     setExtra([]);
     setNext(page.data?.next_offset ?? null);
+    setLiveTotal(page.data?.total ?? null);
   }, [page.data]);
   const inspected = useLive<Inspected>(
     spanId ? `${runId}:${trace.trace_id}:${spanId}` : null,
@@ -158,6 +160,7 @@ export function TracePanel({
     0,
   );
   const spans = [...(page.data?.spans ?? []), ...extra];
+  const displayedTotal = Math.max(liveTotal ?? 0, trace.span_count);
   const selection = useRef(`${runId}:${trace.trace_id}:${trace.span_count}`);
   selection.current = `${runId}:${trace.trace_id}:${trace.span_count}`;
   async function more() {
@@ -171,6 +174,7 @@ export function TracePanel({
       if (selection.current === key) {
         setExtra((items) => [...items, ...result.spans]);
         setNext(result.next_offset);
+        setLiveTotal(result.total);
       }
     } catch (e) {
       setError(String(e));
@@ -207,7 +211,7 @@ export function TracePanel({
             <h2>{trace.name}</h2>
             <span>
               {trace.services.join(", ")} <b>·</b> {duration(trace.duration_ns)}{" "}
-              <b>·</b> {trace.span_count} spans
+              <b>·</b> {displayedTotal} spans
             </span>
           </div>
         </header>
@@ -343,7 +347,7 @@ export function TracePanel({
               disabled={busy}
               onClick={() => void more()}
             >
-              Load more spans ({spans.length} of {trace.span_count})
+              Load more spans ({spans.length} of {displayedTotal})
             </button>
           )}
         </div>
