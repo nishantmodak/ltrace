@@ -8,7 +8,9 @@ use ltrace_local::{
     otlp,
     store::Store,
 };
-use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::collector::trace::v1::{
+    ExportTraceServiceRequest, ExportTraceServiceResponse,
+};
 use prost::Message;
 use serde_json::{Value, json};
 use std::{io::Write, sync::Arc};
@@ -125,6 +127,60 @@ async fn export_retries_are_idempotent_and_return_matching_content_type() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(store.spans(&id).unwrap().len(), 1);
+    assert!(store.run(&id).unwrap().issues.is_empty());
+}
+
+#[tokio::test]
+async fn export_with_param_whitespace_returns_protobuf_response() {
+    let (app, store, id, token) = setup();
+    let request: ExportTraceServiceRequest = serde_json::from_slice(FIXTURE).unwrap();
+    let response = app
+        .oneshot(export(
+            &token,
+            "application/x-protobuf ; charset=utf-8",
+            request.encode_to_vec(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/x-protobuf",
+        "OTLP/HTTP spec: server MUST use the same Content-Type in the response as it received in the request"
+    );
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert!(
+        ExportTraceServiceResponse::decode(body.as_ref()).is_ok(),
+        "response body must be a valid ExportTraceServiceResponse protobuf message"
+    );
+    assert_eq!(store.spans(&id).unwrap().len(), 1);
+    assert!(store.run(&id).unwrap().issues.is_empty());
+}
+
+#[tokio::test]
+async fn export_with_param_whitespace_returns_json_response() {
+    let (app, store, id, token) = setup();
+    let response = app
+        .oneshot(export(
+            &token,
+            "application/json ; charset=utf-8",
+            FIXTURE.into(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/json",
+        "response content-type must match the request's media type when trimmed"
+    );
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(
+        &body[..],
+        b"{}",
+        "json success body must be the empty object"
+    );
     assert_eq!(store.spans(&id).unwrap().len(), 1);
     assert!(store.run(&id).unwrap().issues.is_empty());
 }

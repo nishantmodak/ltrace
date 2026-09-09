@@ -8,6 +8,10 @@ use std::io::Read;
 
 pub const BODY_LIMIT: usize = 4 * 1024 * 1024;
 
+pub fn media_type(content_type: &str) -> &str {
+    content_type.split(';').next().unwrap_or("").trim()
+}
+
 pub fn decode(body: &[u8], content_type: &str, encoding: &str) -> Result<Vec<Span>> {
     let inflated;
     let body = match encoding {
@@ -24,12 +28,11 @@ pub fn decode(body: &[u8], content_type: &str, encoding: &str) -> Result<Vec<Spa
         _ => anyhow::bail!("unsupported content encoding"),
     };
     ensure!(body.len() <= BODY_LIMIT, "export exceeds 4 MiB");
-    let request: ExportTraceServiceRequest =
-        match content_type.split(';').next().unwrap_or("").trim() {
-            "application/json" => serde_json::from_slice(body)?,
-            "application/x-protobuf" => ExportTraceServiceRequest::decode(body)?,
-            _ => anyhow::bail!("use application/json or application/x-protobuf"),
-        };
+    let request: ExportTraceServiceRequest = match media_type(content_type) {
+        "application/json" => serde_json::from_slice(body)?,
+        "application/x-protobuf" => ExportTraceServiceRequest::decode(body)?,
+        _ => anyhow::bail!("use application/json or application/x-protobuf"),
+    };
     let mut spans = vec![];
     for resource_spans in request.resource_spans {
         let resource = serde_json::to_value(&resource_spans.resource)?;

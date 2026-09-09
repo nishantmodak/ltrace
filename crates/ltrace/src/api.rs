@@ -306,7 +306,7 @@ async fn export(
         .and_then(|s| s.to_str().ok())
         .unwrap_or("")
         .to_owned();
-    let protobuf = content_type.split(';').next() == Some("application/x-protobuf");
+    let protobuf = otlp::media_type(&content_type) == "application/x-protobuf";
     let encoding = headers
         .get("content-encoding")
         .and_then(|s| s.to_str().ok())
