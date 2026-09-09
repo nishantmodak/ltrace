@@ -282,6 +282,65 @@ fn trace_index_groups_requests_and_searches_without_raw_attributes() {
     )
     .unwrap();
     assert_eq!(filtered["total"], 0);
+    // A non-root span operation name must be searchable on the per-run endpoint.
+    let child_search = api::read(
+        &store,
+        &format!("runs/{id}/traces"),
+        &[("q".into(), "child".into())].into(),
+    )
+    .unwrap();
+    assert_eq!(child_search["total"], 1);
+}
+
+#[test]
+fn search_scope_diverges_between_cross_run_and_per_run_endpoints() {
+    let (_, store, id, token) = setup();
+    let mut spans = otlp::decode(FIXTURE, "application/json", "").unwrap();
+    spans[0].name = "GET /pay".into();
+    spans[0].service = "api".into();
+    spans[0].parent_span_id.clear();
+    let mut child = spans[0].clone();
+    child.span_id = "7777777777777777".into();
+    child.parent_span_id = spans[0].span_id.clone();
+    child.name = "db.lookup".into();
+    child.service = "db".into();
+    spans.push(child);
+    store.ingest(&token, &spans).unwrap();
+
+    let unfiltered = api::read(&store, &format!("runs/{id}/traces"), &Default::default()).unwrap();
+    assert_eq!(unfiltered["total"], 1);
+    assert_eq!(unfiltered["traces"][0]["name"], "GET /pay");
+    assert_eq!(unfiltered["traces"][0]["span_count"], 2);
+
+    // Both endpoints must agree across every query shape that the per-run
+    // endpoint documents ("operation/service search"). A non-root operation name
+    // is an operation just like the root's, so it must be searchable.
+    for query in ["db.lookup", "db", "GET /pay", "api"] {
+        let cross = api::read(&store, "traces", &[("q".into(), query.into())].into()).unwrap();
+        assert_eq!(
+            cross["total"], 1,
+            "cross-run traces?q={query} should find the trace"
+        );
+        let per_run = api::read(
+            &store,
+            &format!("runs/{id}/traces"),
+            &[("q".into(), query.into())].into(),
+        )
+        .unwrap();
+        assert_eq!(
+            per_run["total"], 1,
+            "per-run runs/{id}/traces?q={query} should find the same trace"
+        );
+    }
+
+    // Negative case: an absent token matches no trace on either endpoint.
+    for path in ["traces", &format!("runs/{id}/traces")] {
+        let absent = api::read(&store, path, &[("q".into(), "absent".into())].into()).unwrap();
+        assert_eq!(
+            absent["total"], 0,
+            "q=absent should match nothing on {path}"
+        );
+    }
 }
 
 #[test]
